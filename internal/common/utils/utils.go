@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/xuecangming/onedrive-storage/internal/common/types"
 	"gopkg.in/yaml.v3"
 )
@@ -119,13 +120,11 @@ func ValidateObjectKey(key string) bool {
 
 // GenerateObjectKey generates a unique object key
 func GenerateObjectKey() string {
-	// Simple implementation - in production, use UUID or similar
-	return fmt.Sprintf("obj_%d", os.Getpid())
+	return "obj_" + uuid.New().String()
 }
 
 // GenerateID generates a unique ID for entities
 func GenerateID() string {
-	// Simple implementation - in production, use UUID
-	return fmt.Sprintf("id_%d_%d", os.Getpid(), os.Getpid())
+	return uuid.New().String()
 }
 

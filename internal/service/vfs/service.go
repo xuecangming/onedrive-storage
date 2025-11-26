@@ -301,44 +301,30 @@ func (s *Service) DeleteDirectory(bucket, path string, recursive bool) error {
 		return errors.NewConflictError("directory is not empty, use recursive=true to delete")
 	}
 
+	var objectKeysToDelete []string
 	if recursive && childCount > 0 {
-		// Delete all children recursively
-		if err := s.deleteDirectoryRecursive(bucket, path); err != nil {
-			return err
+		// Get all files before deleting (so we can clean up objects after)
+		searchPath := strings.TrimSuffix(path, "/")
+		files, err := s.vfsRepo.ListFilesByDirectory(bucket, searchPath)
+		if err != nil {
+			return fmt.Errorf("failed to list files for deletion: %w", err)
+		}
+		
+		// Collect object keys
+		for _, file := range files {
+			objectKeysToDelete = append(objectKeysToDelete, file.ObjectKey)
 		}
 	}
 
-	// Delete the directory itself
-	return s.vfsRepo.DeleteDirectory(dir.ID)
-}
+	// Delete the directory itself (this will cascade delete all virtual_files and subdirectories)
+	if err := s.vfsRepo.DeleteDirectory(dir.ID); err != nil {
+		return err
+	}
 
-// deleteDirectoryRecursive deletes a directory and all its contents
-func (s *Service) deleteDirectoryRecursive(bucket, path string) error {
+	// Now delete the objects from storage (after virtual_files are deleted)
 	ctx := context.Background()
-	
-	// Get all files in this directory tree
-	files, err := s.vfsRepo.ListFilesByDirectory(bucket, path)
-	if err != nil {
-		return err
-	}
-
-	// Delete all files
-	for _, file := range files {
-		// Delete from object storage
-		_ = s.objectSvc.Delete(ctx, bucket, file.ObjectKey)
-		// Delete virtual file record
-		_ = s.vfsRepo.DeleteFile(file.ID)
-	}
-
-	// Get all subdirectories
-	dirs, err := s.vfsRepo.ListDirectoriesByPath(bucket, path)
-	if err != nil {
-		return err
-	}
-
-	// Delete subdirectories in reverse order (deepest first)
-	for i := len(dirs) - 1; i >= 0; i-- {
-		_ = s.vfsRepo.DeleteDirectory(dirs[i].ID)
+	for _, objectKey := range objectKeysToDelete {
+		_ = s.objectSvc.Delete(ctx, bucket, objectKey)
 	}
 
 	return nil
