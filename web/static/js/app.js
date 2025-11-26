@@ -78,6 +78,13 @@
         return iconMap[ext] || '📄';
     }
 
+    // Build VFS API URL with proper encoding
+    function buildVfsUrl(bucket, path) {
+        const encodedBucket = encodeURIComponent(bucket);
+        const encodedPath = encodeURIComponent(path);
+        return `${API_BASE}/vfs/${encodedBucket}/${encodedPath}`;
+    }
+
     function showLoading(show) {
         state.loading = show;
         elements.loadingOverlay.style.display = show ? 'flex' : 'none';
@@ -183,7 +190,8 @@
 
     async function createBucket(name) {
         try {
-            await apiRequest(`/buckets/${name}`, { method: 'PUT' });
+            const encodedName = encodeURIComponent(name);
+            await apiRequest(`/buckets/${encodedName}`, { method: 'PUT' });
             showToast('存储桶创建成功', 'success');
             await loadBuckets();
             selectBucket(name);
@@ -201,8 +209,8 @@
             let path = state.currentPath;
             if (!path.endsWith('/')) path += '/';
             
-            const encodedPath = encodeURIComponent(path);
-            const data = await apiRequest(`/vfs/${state.currentBucket}/${encodedPath}?type=directory`);
+            const url = buildVfsUrl(state.currentBucket, path) + '?type=directory';
+            const data = await apiRequest(url.replace(API_BASE, ''));
             state.items = data.items || [];
             renderFileList();
             renderBreadcrumb();
@@ -362,8 +370,8 @@
                 statusEl.textContent = '上传中...';
                 progressBar.style.width = '50%';
 
-                const encodedPath = encodeURIComponent(path);
-                await fetch(`${API_BASE}/vfs/${state.currentBucket}/${encodedPath}`, {
+                const uploadUrl = buildVfsUrl(state.currentBucket, path);
+                await fetch(uploadUrl, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': file.type || 'application/octet-stream'
@@ -394,8 +402,8 @@
 
     async function downloadFile(path) {
         try {
-            const encodedPath = encodeURIComponent(path);
-            const response = await fetch(`${API_BASE}/vfs/${state.currentBucket}/${encodedPath}`);
+            const downloadUrl = buildVfsUrl(state.currentBucket, path);
+            const response = await fetch(downloadUrl);
             
             if (!response.ok) {
                 throw new Error('Download failed');
@@ -427,8 +435,8 @@
         for (const path of paths) {
             try {
                 const isDir = path.endsWith('/');
-                const encodedPath = encodeURIComponent(path);
-                await apiRequest(`/vfs/${state.currentBucket}/${encodedPath}${isDir ? '?recursive=true' : ''}`, {
+                const deleteUrl = buildVfsUrl(state.currentBucket, path);
+                await apiRequest(deleteUrl.replace(API_BASE, '') + (isDir ? '?recursive=true' : ''), {
                     method: 'DELETE'
                 });
                 successCount++;
@@ -459,7 +467,8 @@
 
         try {
             const path = state.currentPath + (state.currentPath.endsWith('/') ? '' : '/') + name;
-            await apiRequest(`/vfs/${state.currentBucket}/_mkdir`, {
+            const encodedBucket = encodeURIComponent(state.currentBucket);
+            await apiRequest(`/vfs/${encodedBucket}/_mkdir`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -476,7 +485,8 @@
     async function moveItem(source, destination, copy = false) {
         try {
             const endpoint = copy ? '_copy' : '_move';
-            await apiRequest(`/vfs/${state.currentBucket}/${endpoint}`, {
+            const encodedBucket = encodeURIComponent(state.currentBucket);
+            await apiRequest(`/vfs/${encodedBucket}/${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

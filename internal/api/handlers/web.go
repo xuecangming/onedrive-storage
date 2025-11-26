@@ -24,14 +24,31 @@ func (h *WebHandler) ServeStatic(w http.ResponseWriter, r *http.Request) {
 	// Get the path after /static/
 	path := strings.TrimPrefix(r.URL.Path, "/static/")
 
-	// Prevent directory traversal
+	// Clean the path first to normalize any .. sequences
 	path = filepath.Clean(path)
-	if strings.Contains(path, "..") {
+
+	// Construct the full file path
+	filePath := filepath.Join(h.staticDir, path)
+
+	// Ensure the cleaned path is still within the static directory
+	// This handles encoded sequences like %2e%2e
+	absStaticDir, err := filepath.Abs(h.staticDir)
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
 
-	filePath := filepath.Join(h.staticDir, path)
+	// Verify the file is within the static directory
+	if !strings.HasPrefix(absFilePath, absStaticDir+string(filepath.Separator)) && absFilePath != absStaticDir {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
 
 	// Check if file exists
 	info, err := os.Stat(filePath)
