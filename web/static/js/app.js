@@ -78,11 +78,16 @@
         return iconMap[ext] || '📄';
     }
 
-    // Build VFS API URL with proper encoding
-    function buildVfsUrl(bucket, path) {
+    // Build VFS API path with proper encoding (without API_BASE prefix)
+    function buildVfsPath(bucket, path) {
         const encodedBucket = encodeURIComponent(bucket);
         const encodedPath = encodeURIComponent(path);
-        return `${API_BASE}/vfs/${encodedBucket}/${encodedPath}`;
+        return `/vfs/${encodedBucket}/${encodedPath}`;
+    }
+
+    // Build full VFS API URL with proper encoding (with API_BASE prefix)
+    function buildVfsUrl(bucket, path) {
+        return API_BASE + buildVfsPath(bucket, path);
     }
 
     function showLoading(show) {
@@ -209,8 +214,8 @@
             let path = state.currentPath;
             if (!path.endsWith('/')) path += '/';
             
-            const url = buildVfsUrl(state.currentBucket, path) + '?type=directory';
-            const data = await apiRequest(url.replace(API_BASE, ''));
+            const apiPath = buildVfsPath(state.currentBucket, path) + '?type=directory';
+            const data = await apiRequest(apiPath);
             state.items = data.items || [];
             renderFileList();
             renderBreadcrumb();
@@ -435,8 +440,8 @@
         for (const path of paths) {
             try {
                 const isDir = path.endsWith('/');
-                const deleteUrl = buildVfsUrl(state.currentBucket, path);
-                await apiRequest(deleteUrl.replace(API_BASE, '') + (isDir ? '?recursive=true' : ''), {
+                const apiPath = buildVfsPath(state.currentBucket, path) + (isDir ? '?recursive=true' : '');
+                await apiRequest(apiPath, {
                     method: 'DELETE'
                 });
                 successCount++;
@@ -624,8 +629,15 @@
 
             const isCopy = state.moveMode === 'copy';
             for (const source of state.selectedItems) {
-                const fileName = source.split('/').pop();
-                const destPath = destination.endsWith('/') ? destination + fileName : destination + '/' + fileName;
+                // Remove trailing slash and get the file/folder name
+                const cleanSource = source.replace(/\/+$/, '');
+                const parts = cleanSource.split('/');
+                const fileName = parts[parts.length - 1] || 'unnamed';
+                
+                // Ensure destination doesn't have double slashes
+                const cleanDest = destination.replace(/\/+$/, '');
+                const destPath = cleanDest + '/' + fileName;
+                
                 await moveItem(source, destPath, isCopy);
             }
 
@@ -646,12 +658,17 @@
             if (state.contextMenuItem) {
                 const newName = prompt('输入新名称:', state.contextMenuItem.name);
                 if (newName && newName !== state.contextMenuItem.name) {
-                    const parentPath = state.contextMenuItem.path.substring(0, state.contextMenuItem.path.lastIndexOf('/') + 1);
+                    // Clean the path and extract parent directory
+                    const cleanPath = state.contextMenuItem.path.replace(/\/+$/, '');
+                    const lastSlashIndex = cleanPath.lastIndexOf('/');
+                    const parentPath = lastSlashIndex >= 0 ? cleanPath.substring(0, lastSlashIndex + 1) : '/';
                     const isDir = state.contextMenuItem.type === 'directory';
-                    moveItem(
-                        state.contextMenuItem.path + (isDir ? '/' : ''),
-                        parentPath + newName + (isDir ? '/' : '')
-                    );
+                    
+                    // For directories, we need to include trailing slash in source
+                    const sourcePath = isDir ? cleanPath + '/' : cleanPath;
+                    const destPath = isDir ? parentPath + newName + '/' : parentPath + newName;
+                    
+                    moveItem(sourcePath, destPath);
                 }
             }
             hideContextMenu();

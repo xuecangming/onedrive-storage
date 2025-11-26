@@ -44,8 +44,8 @@ func (h *WebHandler) ServeStatic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify the file is within the static directory
-	if !strings.HasPrefix(absFilePath, absStaticDir+string(filepath.Separator)) && absFilePath != absStaticDir {
+	// Verify the file is within the static directory (not the directory itself)
+	if !strings.HasPrefix(absFilePath, absStaticDir+string(filepath.Separator)) {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
