@@ -301,3 +301,201 @@ curl -X DELETE http://localhost:8080/api/v1/objects/my-bucket/hello.txt
 # Delete bucket
 curl -X DELETE http://localhost:8080/api/v1/buckets/my-bucket
 ```
+
+---
+
+## Account Management
+
+### GET /accounts
+List all storage accounts.
+
+**Response 200 OK:**
+```json
+{
+  "accounts": [
+    {
+      "id": "uuid",
+      "name": "E3-Account-01",
+      "email": "dev01@example.onmicrosoft.com",
+      "status": "active",
+      "total_space": 1099511627776,
+      "used_space": 214748364800,
+      "priority": 10,
+      "last_sync": "2024-01-15T10:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-15T10:00:00Z"
+    }
+  ]
+}
+```
+
+### POST /accounts
+Create a new storage account.
+
+**Request Body:**
+```json
+{
+  "name": "E3-Account-01",
+  "email": "dev01@example.onmicrosoft.com",
+  "client_id": "your-client-id",
+  "client_secret": "your-client-secret",
+  "tenant_id": "your-tenant-id",
+  "refresh_token": "your-refresh-token",
+  "priority": 10
+}
+```
+
+**Response 201 Created:**
+```json
+{
+  "id": "uuid",
+  "name": "E3-Account-01",
+  "email": "dev01@example.onmicrosoft.com",
+  "status": "active",
+  "priority": 10,
+  "created_at": "2024-01-15T10:00:00Z"
+}
+```
+
+### GET /accounts/{id}
+Get account details.
+
+**Response 200 OK:**
+```json
+{
+  "id": "uuid",
+  "name": "E3-Account-01",
+  "email": "dev01@example.onmicrosoft.com",
+  "status": "active",
+  "total_space": 1099511627776,
+  "used_space": 214748364800,
+  "priority": 10,
+  "last_sync": "2024-01-15T10:00:00Z"
+}
+```
+
+### PUT /accounts/{id}
+Update account information.
+
+**Request Body:**
+```json
+{
+  "name": "E3-Account-01-Updated",
+  "priority": 20
+}
+```
+
+**Response 200 OK:**
+```json
+{
+  "id": "uuid",
+  "name": "E3-Account-01-Updated",
+  "priority": 20,
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+### DELETE /accounts/{id}
+Delete an account.
+
+**Response 204 No Content**
+
+### POST /accounts/{id}/refresh
+Refresh account's access token.
+
+**Response 200 OK:**
+```json
+{
+  "message": "Token refreshed successfully"
+}
+```
+
+### POST /accounts/{id}/sync
+Sync account space information from OneDrive.
+
+**Response 200 OK:**
+```json
+{
+  "id": "uuid",
+  "name": "E3-Account-01",
+  "total_space": 1099511627776,
+  "used_space": 214748364800,
+  "last_sync": "2024-01-15T10:35:00Z"
+}
+```
+
+---
+
+## Space Management
+
+### GET /space
+Get overall space statistics.
+
+**Response 200 OK:**
+```json
+{
+  "total_accounts": 5,
+  "active_accounts": 4,
+  "total_space": 5497558138880,
+  "used_space": 1073741824000,
+  "available_space": 4423816314880,
+  "usage_percent": 19.5
+}
+```
+
+### GET /space/accounts
+List accounts with space information.
+
+**Response 200 OK:**
+```json
+{
+  "accounts": [
+    {
+      "id": "uuid",
+      "name": "E3-Account-01",
+      "email": "dev01@example.onmicrosoft.com",
+      "status": "active",
+      "total_space": 1099511627776,
+      "used_space": 214748364800,
+      "available_space": 884763262976,
+      "usage_percent": 19.5,
+      "priority": 10,
+      "last_sync": "2024-01-15T10:00:00Z"
+    }
+  ]
+}
+```
+
+### GET /space/accounts/{id}
+Get space details for a specific account.
+
+**Response 200 OK:**
+Same as `GET /accounts/{id}`
+
+### POST /space/accounts/{id}/sync
+Sync space information for a specific account.
+
+**Response 200 OK:**
+Same as `POST /accounts/{id}/sync`
+
+---
+
+## Phase 3 Features
+
+### Load Balancing
+The system automatically selects the best account for storing files based on:
+- **Least Used**: Selects account with lowest usage percentage (default)
+- **Round Robin**: Cycles through accounts
+- **Weighted**: Uses priority-based weighted random selection
+
+### Token Management
+- Automatic token refresh when token expires within 5 minutes
+- Token validation before OneDrive operations
+- Failed operations trigger account status update
+
+### OneDrive Integration
+- Small files (<4MB): Direct upload
+- Large files (≥4MB): Chunked upload via upload session
+- Automatic retry on failure
+- Fallback to in-memory storage when OneDrive is disabled
+
