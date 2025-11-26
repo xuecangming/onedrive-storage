@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneDrive 云盘</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="header-left">
+                <h1 class="logo">☁️ OneDrive 云盘</h1>
+            </div>
+            <div class="header-right">
+                <button id="btn-create-folder" class="btn btn-secondary">📁 新建文件夹</button>
+                <button id="btn-upload" class="btn btn-primary">📤 上传文件</button>
+                <input type="file" id="file-input" multiple style="display: none;">
+            </div>
+        </header>
+
+        <div class="main-container">
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>存储空间</h3>
+                    <div class="bucket-list" id="bucket-list">
+                        <!-- Buckets will be loaded here -->
+                    </div>
+                    <button id="btn-create-bucket" class="btn btn-small">+ 创建存储桶</button>
+                </div>
+            </aside>
+
+            <main class="content">
+                <nav class="breadcrumb" id="breadcrumb">
+                    <span class="breadcrumb-item" data-path="/">根目录</span>
+                </nav>
+
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <span id="selection-info"></span>
+                    </div>
+                    <div class="toolbar-right">
+                        <button id="btn-delete" class="btn btn-danger btn-small" disabled>🗑️ 删除</button>
+                        <button id="btn-move" class="btn btn-secondary btn-small" disabled>📦 移动</button>
+                        <button id="btn-copy" class="btn btn-secondary btn-small" disabled>📋 复制</button>
+                    </div>
+                </div>
+
+                <div class="file-browser" id="file-browser">
+                    <div class="empty-state" id="empty-state">
+                        <div class="empty-icon">📂</div>
+                        <p>这个文件夹是空的</p>
+                        <p class="empty-hint">上传文件或创建文件夹开始使用</p>
+                    </div>
+                    <div class="file-list" id="file-list">
+                        <!-- Files and folders will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="loading-overlay" id="loading-overlay" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>加载中...</p>
+                </div>
+            </main>
+        </div>
+
+        <!-- Upload Progress Modal -->
+        <div id="upload-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>上传文件</h2>
+                    <button class="modal-close" id="close-upload-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="upload-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Folder Modal -->
+        <div id="folder-modal" class="modal" style="display: none;">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>新建文件夹</h2>
+                    <button class="modal-close" id="close-folder-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="folder-name-input" class="input-field" placeholder="请输入文件夹名称">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancel-folder-btn">取消</button>
+                    <button class="btn btn-primary" id="confirm-folder-btn">确定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Bucket Modal -->
+        <div id="bucket-modal" class="modal" style="display: none;">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>创建存储桶</h2>
+                    <button class="modal-close" id="close-bucket-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="bucket-name-input" class="input-field" placeholder="请输入存储桶名称（小写字母、数字和连字符）">
+                    <p class="input-hint">存储桶名称只能包含小写字母、数字和连字符，长度3-63个字符</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancel-bucket-btn">取消</button>
+                    <button class="btn btn-primary" id="confirm-bucket-btn">确定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Move/Copy Modal -->
+        <div id="move-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="move-modal-title">移动到</h2>
+                    <button class="modal-close" id="close-move-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="destination-input" class="input-field" placeholder="请输入目标路径">
+                    <p class="input-hint">输入目标文件夹路径，如：/documents/backup</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancel-move-btn">取消</button>
+                    <button class="btn btn-primary" id="confirm-move-btn">确定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Context Menu -->
+        <div id="context-menu" class="context-menu" style="display: none;">
+            <ul>
+                <li id="ctx-download">📥 下载</li>
+                <li id="ctx-rename">✏️ 重命名</li>
+                <li id="ctx-move">📦 移动</li>
+                <li id="ctx-copy">📋 复制</li>
+                <li class="separator"></li>
+                <li id="ctx-delete" class="danger">🗑️ 删除</li>
+            </ul>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toast-container" class="toast-container"></div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -125,12 +125,12 @@ func (h *HealthHandler) checkSystem() ComponentHealth {
 	runtime.ReadMemStats(&m)
 
 	details := map[string]interface{}{
-		"goroutines":      runtime.NumGoroutine(),
-		"alloc_mb":        m.Alloc / 1024 / 1024,
-		"total_alloc_mb":  m.TotalAlloc / 1024 / 1024,
-		"sys_mb":          m.Sys / 1024 / 1024,
-		"num_gc":          m.NumGC,
-		"last_gc":         time.Unix(0, int64(m.LastGC)).Format(time.RFC3339),
+		"goroutines":     runtime.NumGoroutine(),
+		"alloc_mb":       m.Alloc / 1024 / 1024,
+		"total_alloc_mb": m.TotalAlloc / 1024 / 1024,
+		"sys_mb":         m.Sys / 1024 / 1024,
+		"num_gc":         m.NumGC,
+		"last_gc":        time.Unix(0, int64(m.LastGC)).Format(time.RFC3339),
 	}
 
 	status := "healthy"

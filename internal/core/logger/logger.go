@@ -189,7 +189,7 @@ func (l *StandardLogger) logJSON(level Level, msg string, fields []Field) {
 // logText logs in text format
 func (l *StandardLogger) logText(level Level, msg string, fields []Field) {
 	timestamp := time.Now().Format(l.config.TimeFormat)
-	
+
 	// Build field string
 	fieldStr := ""
 	if len(fields) > 0 {

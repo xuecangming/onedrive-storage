@@ -90,6 +90,31 @@ export DB_PASSWORD=your_password
 
 The server will start on `http://localhost:8080` by default.
 
+## Using the Cloud Drive Web Application
+
+After starting the server, open your browser and navigate to:
+
+```
+http://localhost:8080/
+```
+
+This will open the cloud drive web application, which provides:
+
+- **Storage Bucket Management**: Create and manage storage buckets
+- **File Browser**: Navigate through folders and files with a visual interface
+- **File Upload**: Drag and drop or click to upload files
+- **File Download**: Click to download files
+- **Folder Operations**: Create, delete, move, and copy folders
+- **File Operations**: Delete, move, copy, and rename files
+
+### Getting Started with the Web App
+
+1. **Create a Storage Bucket**: Click "创建存储桶" to create a new bucket
+2. **Upload Files**: Click "上传文件" or drag files into the file browser
+3. **Create Folders**: Click "新建文件夹" to organize your files
+4. **Navigate**: Double-click folders to open them, use breadcrumbs to go back
+5. **Manage Files**: Right-click on files for context menu with more options
+
 ## Verify the Installation
 
 ### Check Server Health
@@ -119,7 +144,7 @@ Expected response:
 
 This will run a comprehensive test of all API endpoints.
 
-## Basic Usage
+## Basic API Usage
 
 ### Create a Bucket
 

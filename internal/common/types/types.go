@@ -53,23 +53,23 @@ type TTLConfig struct {
 
 // StorageConfig represents storage configuration
 type StorageConfig struct {
-	Upload       UploadConfig       `yaml:"upload"`
-	LoadBalance  LoadBalanceConfig  `yaml:"load_balance"`
-	Retry        RetryConfig        `yaml:"retry"`
+	Upload      UploadConfig      `yaml:"upload"`
+	LoadBalance LoadBalanceConfig `yaml:"load_balance"`
+	Retry       RetryConfig       `yaml:"retry"`
 }
 
 // UploadConfig represents upload configuration
 type UploadConfig struct {
-	MaxFileSize     int64 `yaml:"max_file_size"`
-	ChunkSize       int64 `yaml:"chunk_size"`
-	ChunkThreshold  int64 `yaml:"chunk_threshold"`
-	ParallelChunks  int   `yaml:"parallel_chunks"`
+	MaxFileSize    int64 `yaml:"max_file_size"`
+	ChunkSize      int64 `yaml:"chunk_size"`
+	ChunkThreshold int64 `yaml:"chunk_threshold"`
+	ParallelChunks int   `yaml:"parallel_chunks"`
 }
 
 // LoadBalanceConfig represents load balance configuration
 type LoadBalanceConfig struct {
-	Strategy             string `yaml:"strategy"`
-	HealthCheckInterval  int    `yaml:"health_check_interval"`
+	Strategy            string `yaml:"strategy"`
+	HealthCheckInterval int    `yaml:"health_check_interval"`
 }
 
 // RetryConfig represents retry configuration
@@ -82,15 +82,15 @@ type RetryConfig struct {
 
 // TokenConfig represents token management configuration
 type TokenConfig struct {
-	RefreshBeforeExpire   int `yaml:"refresh_before_expire"`
-	RefreshCheckInterval  int `yaml:"refresh_check_interval"`
+	RefreshBeforeExpire  int `yaml:"refresh_before_expire"`
+	RefreshCheckInterval int `yaml:"refresh_check_interval"`
 }
 
 // LoggingConfig represents logging configuration
 type LoggingConfig struct {
-	Level  string          `yaml:"level"`
-	Format string          `yaml:"format"`
-	Output string          `yaml:"output"`
+	Level  string            `yaml:"level"`
+	Format string            `yaml:"format"`
+	Output string            `yaml:"output"`
 	File   LoggingFileConfig `yaml:"file"`
 }
 
@@ -145,23 +145,23 @@ type ObjectChunk struct {
 
 // StorageAccount represents a OneDrive storage account
 type StorageAccount struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Email         string    `json:"email"`
-	ClientID      string    `json:"client_id,omitempty"`
-	ClientSecret  string    `json:"client_secret,omitempty"`
-	TenantID      string    `json:"tenant_id,omitempty"`
-	RefreshToken  string    `json:"refresh_token,omitempty"`
-	AccessToken   string    `json:"access_token,omitempty"`
-	TokenExpires  time.Time `json:"token_expires,omitempty"`
-	TotalSpace    int64     `json:"total_space"`
-	UsedSpace     int64     `json:"used_space"`
-	Status        string    `json:"status"`
-	Priority      int       `json:"priority"`
-	LastSync      time.Time `json:"last_sync,omitempty"`
-	ErrorMessage  string    `json:"error_message,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Email        string    `json:"email"`
+	ClientID     string    `json:"client_id,omitempty"`
+	ClientSecret string    `json:"client_secret,omitempty"`
+	TenantID     string    `json:"tenant_id,omitempty"`
+	RefreshToken string    `json:"refresh_token,omitempty"`
+	AccessToken  string    `json:"access_token,omitempty"`
+	TokenExpires time.Time `json:"token_expires,omitempty"`
+	TotalSpace   int64     `json:"total_space"`
+	UsedSpace    int64     `json:"used_space"`
+	Status       string    `json:"status"`
+	Priority     int       `json:"priority"`
+	LastSync     time.Time `json:"last_sync,omitempty"`
+	ErrorMessage string    `json:"error_message,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // VirtualDirectory represents a virtual directory
@@ -190,12 +190,12 @@ type VirtualFile struct {
 
 // VFSItem represents a virtual file system item (file or directory)
 type VFSItem struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Path      string    `json:"path"`
-	Type      string    `json:"type"` // "file" or "directory"
-	Size      int64     `json:"size,omitempty"`
-	MimeType  string    `json:"mime_type,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	Path      string     `json:"path"`
+	Type      string     `json:"type"` // "file" or "directory"
+	Size      int64      `json:"size,omitempty"`
+	MimeType  string     `json:"mime_type,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }

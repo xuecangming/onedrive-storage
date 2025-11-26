@@ -253,14 +253,14 @@ func (r *VFSRepository) UpdateDirectory(dir *types.VirtualDirectory) error {
 // CountDirectoryChildren counts files and subdirectories in a directory
 func (r *VFSRepository) CountDirectoryChildren(id string) (int, error) {
 	var count int
-	
+
 	// Count subdirectories
 	dirQuery := `SELECT COUNT(*) FROM virtual_directories WHERE parent_id = $1`
 	err := r.db.QueryRow(dirQuery, id).Scan(&count)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	// Count files
 	fileQuery := `SELECT COUNT(*) FROM virtual_files WHERE directory_id = $1`
 	var fileCount int
@@ -268,7 +268,7 @@ func (r *VFSRepository) CountDirectoryChildren(id string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	
+
 	return count + fileCount, nil
 }
 
