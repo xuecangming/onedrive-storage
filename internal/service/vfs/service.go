@@ -96,7 +96,7 @@ func (s *Service) UploadFile(bucket, path string, content io.Reader, size int64,
 		Name:        filename,
 		FullPath:    path,
 		ObjectKey:   objectKey,
-		Size:        size,
+		Size:        int64(len(data)), // Use actual data size, not Content-Length
 		MimeType:    mimeType,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -270,7 +270,8 @@ func (s *Service) DeleteFile(bucket, path string) error {
 	ctx := context.Background()
 	if err := s.objectSvc.Delete(ctx, bucket, file.ObjectKey); err != nil {
 		// Log error but don't fail - virtual file is already deleted
-		return nil
+		// In production, this should use proper logging framework
+		fmt.Printf("Warning: failed to delete object %s from storage: %v\n", file.ObjectKey, err)
 	}
 
 	return nil
@@ -324,7 +325,10 @@ func (s *Service) DeleteDirectory(bucket, path string, recursive bool) error {
 	// Now delete the objects from storage (after virtual_files are deleted)
 	ctx := context.Background()
 	for _, objectKey := range objectKeysToDelete {
-		_ = s.objectSvc.Delete(ctx, bucket, objectKey)
+		if err := s.objectSvc.Delete(ctx, bucket, objectKey); err != nil {
+			// Log error but continue - virtual files are already deleted
+			fmt.Printf("Warning: failed to delete object %s from storage: %v\n", objectKey, err)
+		}
 	}
 
 	return nil
@@ -451,6 +455,10 @@ func (s *Service) MoveDirectory(bucket, source, destination string) (*types.Virt
 
 // updatePathsAfterMove updates all paths under a moved directory
 func (s *Service) updatePathsAfterMove(bucket, oldPath, newPath string) error {
+	// Ensure paths don't have trailing slashes for consistent replacement
+	oldPath = strings.TrimSuffix(oldPath, "/")
+	newPath = strings.TrimSuffix(newPath, "/")
+	
 	// Get all subdirectories
 	dirs, err := s.vfsRepo.ListDirectoriesByPath(bucket, oldPath+"/")
 	if err != nil {

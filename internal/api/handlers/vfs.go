@@ -1,8 +1,8 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -277,7 +277,7 @@ func (h *VFSHandler) Copy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upload to new location
-	newFile, err := h.vfsService.UploadFile(bucket, req.Destination, io.NopCloser(strings.NewReader(string(data))), file.Size, file.MimeType)
+	newFile, err := h.vfsService.UploadFile(bucket, req.Destination, bytes.NewReader(data), file.Size, file.MimeType)
 	if err != nil {
 		errors.WriteError(w, err)
 		return
