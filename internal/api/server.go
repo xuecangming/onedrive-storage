@@ -12,6 +12,7 @@ import (
 	"github.com/xuecangming/onedrive-storage/internal/service/account"
 	"github.com/xuecangming/onedrive-storage/internal/service/bucket"
 	"github.com/xuecangming/onedrive-storage/internal/service/object"
+	"github.com/xuecangming/onedrive-storage/internal/service/vfs"
 )
 
 // Server represents the HTTP server
@@ -24,6 +25,7 @@ type Server struct {
 	accountHandler *handlers.AccountHandler
 	spaceHandler   *handlers.SpaceHandler
 	healthHandler  *handlers.HealthHandler
+	vfsHandler     *handlers.VFSHandler
 }
 
 // NewServer creates a new HTTP server
@@ -32,11 +34,13 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	bucketRepo := repository.NewBucketRepository(db)
 	objectRepo := repository.NewObjectRepository(db)
 	accountRepo := repository.NewAccountRepository(db)
+	vfsRepo := repository.NewVFSRepository(db)
 
 	// Create services
 	bucketService := bucket.NewService(bucketRepo)
 	accountService := account.NewService(accountRepo)
 	objectService := object.NewService(objectRepo, bucketRepo)
+	vfsService := vfs.NewService(vfsRepo, objectService, bucketRepo)
 
 	// Create handlers
 	bucketHandler := handlers.NewBucketHandler(bucketService)
@@ -44,6 +48,7 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	accountHandler := handlers.NewAccountHandler(accountService)
 	spaceHandler := handlers.NewSpaceHandler(accountService)
 	healthHandler := handlers.NewHealthHandler(db)
+	vfsHandler := handlers.NewVFSHandler(vfsService)
 
 	server := &Server{
 		config:         config,
@@ -54,6 +59,7 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 		accountHandler: accountHandler,
 		spaceHandler:   spaceHandler,
 		healthHandler:  healthHandler,
+		vfsHandler:     vfsHandler,
 	}
 
 	server.setupRoutes()
@@ -75,9 +81,11 @@ func (s *Server) setupRoutes() {
 	// API v1 routes
 	api := s.router.PathPrefix(s.config.Server.APIPrefix).Subrouter()
 
-	// Health check
+	// Health check and readiness endpoints
 	api.HandleFunc("/health", s.healthHandler.Health).Methods("GET")
 	api.HandleFunc("/info", s.healthHandler.Info).Methods("GET")
+	api.HandleFunc("/ready", s.healthHandler.Ready).Methods("GET")
+	api.HandleFunc("/live", s.healthHandler.Live).Methods("GET")
 
 	// Bucket routes
 	api.HandleFunc("/buckets", s.bucketHandler.List).Methods("GET")
@@ -105,4 +113,13 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/space/accounts", s.spaceHandler.ListAccounts).Methods("GET")
 	api.HandleFunc("/space/accounts/{id}", s.spaceHandler.AccountDetail).Methods("GET")
 	api.HandleFunc("/space/accounts/{id}/sync", s.spaceHandler.SyncAccount).Methods("POST")
+
+	// Virtual File System routes
+	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.UploadFile).Methods("PUT")
+	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Get).Methods("GET")
+	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Head).Methods("HEAD")
+	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Delete).Methods("DELETE")
+	api.HandleFunc("/vfs/{bucket}/_mkdir", s.vfsHandler.CreateDirectory).Methods("POST")
+	api.HandleFunc("/vfs/{bucket}/_move", s.vfsHandler.Move).Methods("POST")
+	api.HandleFunc("/vfs/{bucket}/_copy", s.vfsHandler.Copy).Methods("POST")
 }

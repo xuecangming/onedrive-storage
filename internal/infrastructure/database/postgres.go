@@ -45,6 +45,7 @@ func RunMigrations(db *sql.DB) error {
 		createObjectChunksTable,
 		createVirtualDirectoriesTable,
 		createVirtualFilesTable,
+		insertDummyAccount,
 	}
 
 	for _, migration := range migrations {
@@ -209,3 +210,20 @@ CREATE INDEX IF NOT EXISTS idx_vfile_bucket_path ON virtual_files(bucket, full_p
 CREATE INDEX IF NOT EXISTS idx_vfile_directory ON virtual_files(directory_id);
 CREATE INDEX IF NOT EXISTS idx_vfile_object ON virtual_files(bucket, object_key);
 `
+
+const insertDummyAccount = `
+INSERT INTO storage_accounts (
+    id, name, email, client_id, client_secret, tenant_id, status
+)
+VALUES (
+    '00000000-0000-0000-0000-000000000000',
+    'In-Memory Storage',
+    'dummy@localhost',
+    'dummy-client',
+    'dummy-secret',
+    'dummy-tenant',
+    'active'
+)
+ON CONFLICT (id) DO NOTHING;
+`
+

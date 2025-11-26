@@ -187,3 +187,15 @@ type VirtualFile struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
+
+// VFSItem represents a virtual file system item (file or directory)
+type VFSItem struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Path      string    `json:"path"`
+	Type      string    `json:"type"` // "file" or "directory"
+	Size      int64     `json:"size,omitempty"`
+	MimeType  string    `json:"mime_type,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+}
