@@ -9,6 +9,7 @@ import (
 	"github.com/xuecangming/onedrive-storage/internal/api/middleware"
 	"github.com/xuecangming/onedrive-storage/internal/common/types"
 	"github.com/xuecangming/onedrive-storage/internal/repository"
+	"github.com/xuecangming/onedrive-storage/internal/service/account"
 	"github.com/xuecangming/onedrive-storage/internal/service/bucket"
 	"github.com/xuecangming/onedrive-storage/internal/service/object"
 )
@@ -20,6 +21,8 @@ type Server struct {
 	router         *mux.Router
 	bucketHandler  *handlers.BucketHandler
 	objectHandler  *handlers.ObjectHandler
+	accountHandler *handlers.AccountHandler
+	spaceHandler   *handlers.SpaceHandler
 	healthHandler  *handlers.HealthHandler
 }
 
@@ -28,23 +31,29 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	// Create repositories
 	bucketRepo := repository.NewBucketRepository(db)
 	objectRepo := repository.NewObjectRepository(db)
+	accountRepo := repository.NewAccountRepository(db)
 
 	// Create services
 	bucketService := bucket.NewService(bucketRepo)
+	accountService := account.NewService(accountRepo)
 	objectService := object.NewService(objectRepo, bucketRepo)
 
 	// Create handlers
 	bucketHandler := handlers.NewBucketHandler(bucketService)
 	objectHandler := handlers.NewObjectHandler(objectService)
+	accountHandler := handlers.NewAccountHandler(accountService)
+	spaceHandler := handlers.NewSpaceHandler(accountService)
 	healthHandler := handlers.NewHealthHandler(db)
 
 	server := &Server{
-		config:        config,
-		db:            db,
-		router:        mux.NewRouter(),
-		bucketHandler: bucketHandler,
-		objectHandler: objectHandler,
-		healthHandler: healthHandler,
+		config:         config,
+		db:             db,
+		router:         mux.NewRouter(),
+		bucketHandler:  bucketHandler,
+		objectHandler:  objectHandler,
+		accountHandler: accountHandler,
+		spaceHandler:   spaceHandler,
+		healthHandler:  healthHandler,
 	}
 
 	server.setupRoutes()
@@ -81,4 +90,19 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Download).Methods("GET")
 	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Head).Methods("HEAD")
 	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Delete).Methods("DELETE")
+
+	// Account management routes
+	api.HandleFunc("/accounts", s.accountHandler.List).Methods("GET")
+	api.HandleFunc("/accounts", s.accountHandler.Create).Methods("POST")
+	api.HandleFunc("/accounts/{id}", s.accountHandler.Get).Methods("GET")
+	api.HandleFunc("/accounts/{id}", s.accountHandler.Update).Methods("PUT")
+	api.HandleFunc("/accounts/{id}", s.accountHandler.Delete).Methods("DELETE")
+	api.HandleFunc("/accounts/{id}/refresh", s.accountHandler.RefreshToken).Methods("POST")
+	api.HandleFunc("/accounts/{id}/sync", s.accountHandler.SyncSpace).Methods("POST")
+
+	// Space management routes
+	api.HandleFunc("/space", s.spaceHandler.Overview).Methods("GET")
+	api.HandleFunc("/space/accounts", s.spaceHandler.ListAccounts).Methods("GET")
+	api.HandleFunc("/space/accounts/{id}", s.spaceHandler.AccountDetail).Methods("GET")
+	api.HandleFunc("/space/accounts/{id}/sync", s.spaceHandler.SyncAccount).Methods("POST")
 }
