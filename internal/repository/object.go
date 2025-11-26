@@ -29,10 +29,17 @@ func (r *ObjectRepository) Create(ctx context.Context, obj *types.Object) error 
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 
-	metadataJSON, _ := json.Marshal(obj.Metadata)
+	var metadataJSON []byte
+	var err error
+	if obj.Metadata != nil {
+		metadataJSON, err = json.Marshal(obj.Metadata)
+		if err != nil {
+			return err
+		}
+	}
 	now := time.Now()
 
-	_, err := r.db.ExecContext(ctx, query,
+	_, err = r.db.ExecContext(ctx, query,
 		obj.Bucket, obj.Key, obj.AccountID, obj.RemoteID, obj.RemotePath,
 		obj.Size, obj.ETag, obj.MimeType, obj.IsChunked, obj.ChunkCount,
 		metadataJSON, now, now,
