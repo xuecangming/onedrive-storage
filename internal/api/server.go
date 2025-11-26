@@ -81,9 +81,11 @@ func (s *Server) setupRoutes() {
 	// API v1 routes
 	api := s.router.PathPrefix(s.config.Server.APIPrefix).Subrouter()
 
-	// Health check
+	// Health check and readiness endpoints
 	api.HandleFunc("/health", s.healthHandler.Health).Methods("GET")
 	api.HandleFunc("/info", s.healthHandler.Info).Methods("GET")
+	api.HandleFunc("/ready", s.healthHandler.Ready).Methods("GET")
+	api.HandleFunc("/live", s.healthHandler.Live).Methods("GET")
 
 	// Bucket routes
 	api.HandleFunc("/buckets", s.bucketHandler.List).Methods("GET")
