@@ -3,6 +3,7 @@ package middleware
 import (
 	"log"
 	"net/http"
+	"runtime"
 	"time"
 )
 
@@ -32,6 +33,10 @@ func RecoveryMiddleware(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Printf("Panic recovered: %v", err)
+				// Print stack trace
+				buf := make([]byte, 4096)
+				n := runtime.Stack(buf, false)
+				log.Printf("Stack trace:\n%s", buf[:n])
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 		}()

@@ -81,8 +81,11 @@
     // Build VFS API path with proper encoding (without API_BASE prefix)
     function buildVfsPath(bucket, path) {
         const encodedBucket = encodeURIComponent(bucket);
-        const encodedPath = encodeURIComponent(path);
-        return `/vfs/${encodedBucket}/${encodedPath}`;
+        // Don't encode the path - it contains '/' that should be preserved
+        // The path is already properly formatted with leading '/'
+        // Remove leading slash to avoid double slash in URL
+        const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+        return `/vfs/${encodedBucket}/${cleanPath}`;
     }
 
     // Build full VFS API URL with proper encoding (with API_BASE prefix)

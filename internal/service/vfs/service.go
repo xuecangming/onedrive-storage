@@ -577,7 +577,11 @@ func splitPath(path string) (string, string) {
 	if dir == "" {
 		dir = "/"
 	} else {
+		// Trim trailing slash unless it's the root
 		dir = strings.TrimSuffix(dir, "/")
+		if dir == "" {
+			dir = "/"
+		}
 	}
 
 	return dir, file
