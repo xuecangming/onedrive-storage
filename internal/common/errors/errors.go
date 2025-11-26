@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -135,3 +136,42 @@ func InternalError(message string) *AppError {
 func UpstreamError(message string) *AppError {
 	return NewAppError(ErrUpstreamError, message, http.StatusBadGateway)
 }
+
+// NewInvalidRequestError creates a new invalid request error
+func NewInvalidRequestError(message string) *AppError {
+	return InvalidRequest(message)
+}
+
+// NewBucketNotFoundError creates a new bucket not found error
+func NewBucketNotFoundError(bucketName string) *AppError {
+	return BucketNotFound(bucketName)
+}
+
+// NewConflictError creates a new conflict error
+func NewConflictError(message string) *AppError {
+	return NewAppError(ErrObjectExists, message, http.StatusConflict)
+}
+
+// NewNotFoundError creates a new not found error
+func NewNotFoundError(message string) *AppError {
+	return NewAppError(ErrObjectNotFound, message, http.StatusNotFound)
+}
+
+// WriteError writes an error response
+func WriteError(w http.ResponseWriter, err error) {
+	appErr, ok := err.(*AppError)
+	if !ok {
+		appErr = InternalError(err.Error())
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(appErr.HTTPStatus)
+	
+	response := map[string]interface{}{
+		"error": appErr,
+	}
+	
+	// Don't fail if JSON encoding fails
+	_ = json.NewEncoder(w).Encode(response)
+}
+

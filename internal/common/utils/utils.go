@@ -122,3 +122,10 @@ func GenerateObjectKey() string {
 	// Simple implementation - in production, use UUID or similar
 	return fmt.Sprintf("obj_%d", os.Getpid())
 }
+
+// GenerateID generates a unique ID for entities
+func GenerateID() string {
+	// Simple implementation - in production, use UUID
+	return fmt.Sprintf("id_%d_%d", os.Getpid(), os.Getpid())
+}
+
