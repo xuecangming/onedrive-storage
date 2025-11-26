@@ -3,6 +3,8 @@ package api
 import (
 	"database/sql"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/gorilla/mux"
 	"github.com/xuecangming/onedrive-storage/internal/api/handlers"
@@ -26,6 +28,7 @@ type Server struct {
 	spaceHandler   *handlers.SpaceHandler
 	healthHandler  *handlers.HealthHandler
 	vfsHandler     *handlers.VFSHandler
+	webHandler     *handlers.WebHandler
 }
 
 // NewServer creates a new HTTP server
@@ -50,6 +53,10 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	healthHandler := handlers.NewHealthHandler(db)
 	vfsHandler := handlers.NewVFSHandler(vfsService)
 
+	// Create web handler with static directory
+	staticDir := getStaticDir()
+	webHandler := handlers.NewWebHandler(staticDir)
+
 	server := &Server{
 		config:         config,
 		db:             db,
@@ -60,11 +67,42 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 		spaceHandler:   spaceHandler,
 		healthHandler:  healthHandler,
 		vfsHandler:     vfsHandler,
+		webHandler:     webHandler,
 	}
 
 	server.setupRoutes()
 
 	return server
+}
+
+// getStaticDir returns the path to the static files directory
+func getStaticDir() string {
+	// Try to find the web/static directory relative to the executable
+	execPath, err := os.Executable()
+	if err == nil {
+		// Check relative to executable
+		dir := filepath.Join(filepath.Dir(execPath), "web", "static")
+		if _, err := os.Stat(dir); err == nil {
+			return dir
+		}
+		// Check parent directory (for development)
+		dir = filepath.Join(filepath.Dir(execPath), "..", "web", "static")
+		if _, err := os.Stat(dir); err == nil {
+			return dir
+		}
+	}
+
+	// Try current working directory
+	cwd, err := os.Getwd()
+	if err == nil {
+		dir := filepath.Join(cwd, "web", "static")
+		if _, err := os.Stat(dir); err == nil {
+			return dir
+		}
+	}
+
+	// Default fallback
+	return "web/static"
 }
 
 // Router returns the HTTP router
@@ -122,4 +160,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vfs/{bucket}/_mkdir", s.vfsHandler.CreateDirectory).Methods("POST")
 	api.HandleFunc("/vfs/{bucket}/_move", s.vfsHandler.Move).Methods("POST")
 	api.HandleFunc("/vfs/{bucket}/_copy", s.vfsHandler.Copy).Methods("POST")
+
+	// Web application routes (static files)
+	s.router.PathPrefix("/static/").HandlerFunc(s.webHandler.ServeStatic)
+	s.router.HandleFunc("/", s.webHandler.ServeIndex).Methods("GET")
 }

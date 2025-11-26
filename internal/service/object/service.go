@@ -22,7 +22,7 @@ type Service struct {
 	bucketRepo     *repository.BucketRepository
 	accountService *account.Service
 	balancer       *loadbalancer.Balancer
-	useOneDrive    bool           // Flag to enable/disable OneDrive
+	useOneDrive    bool              // Flag to enable/disable OneDrive
 	storage        map[string][]byte // In-memory storage fallback
 }
 

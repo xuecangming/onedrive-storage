@@ -29,13 +29,13 @@ const (
 	ErrDirNotEmpty    ErrorCode = "DIR_NOT_EMPTY"
 
 	// 413, 507 errors
-	ErrFileTooLarge  ErrorCode = "FILE_TOO_LARGE"
-	ErrStorageFull   ErrorCode = "STORAGE_FULL"
+	ErrFileTooLarge ErrorCode = "FILE_TOO_LARGE"
+	ErrStorageFull  ErrorCode = "STORAGE_FULL"
 
 	// 500 errors
-	ErrInternal        ErrorCode = "INTERNAL_ERROR"
-	ErrUpstreamError   ErrorCode = "UPSTREAM_ERROR"
-	ErrServiceUnavail  ErrorCode = "SERVICE_UNAVAIL"
+	ErrInternal       ErrorCode = "INTERNAL_ERROR"
+	ErrUpstreamError  ErrorCode = "UPSTREAM_ERROR"
+	ErrServiceUnavail ErrorCode = "SERVICE_UNAVAIL"
 )
 
 // AppError represents an application error
@@ -166,12 +166,11 @@ func WriteError(w http.ResponseWriter, err error) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(appErr.HTTPStatus)
-	
+
 	response := map[string]interface{}{
 		"error": appErr,
 	}
-	
+
 	// Don't fail if JSON encoding fails
 	_ = json.NewEncoder(w).Encode(response)
 }
-

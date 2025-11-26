@@ -127,4 +127,3 @@ func GenerateObjectKey() string {
 func GenerateID() string {
 	return uuid.New().String()
 }
-

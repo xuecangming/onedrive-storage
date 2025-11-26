@@ -159,7 +159,22 @@ func (h *VFSHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *VFSHandler) CreateDirectory(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	bucket := vars["bucket"]
-	path := vars["path"]
+
+	// Parse request body for path
+	var req struct {
+		Path string `json:"path"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errors.WriteError(w, errors.NewInvalidRequestError("invalid request body"))
+		return
+	}
+
+	path := req.Path
+	if path == "" {
+		errors.WriteError(w, errors.NewInvalidRequestError("path is required"))
+		return
+	}
 
 	// Ensure path is properly formatted
 	if !strings.HasPrefix(path, "/") {

@@ -252,7 +252,7 @@ func (s *Service) CreateDirectory(bucket, path string) (*types.VirtualDirectory,
 // DeleteFile deletes a file
 func (s *Service) DeleteFile(bucket, path string) error {
 	path = normalizePath(path)
-	
+
 	file, err := s.vfsRepo.GetFile(bucket, path)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -310,7 +310,7 @@ func (s *Service) DeleteDirectory(bucket, path string, recursive bool) error {
 		if err != nil {
 			return fmt.Errorf("failed to list files for deletion: %w", err)
 		}
-		
+
 		// Collect object keys
 		for _, file := range files {
 			objectKeysToDelete = append(objectKeysToDelete, file.ObjectKey)
@@ -458,7 +458,7 @@ func (s *Service) updatePathsAfterMove(bucket, oldPath, newPath string) error {
 	// Ensure paths don't have trailing slashes for consistent replacement
 	oldPath = strings.TrimSuffix(oldPath, "/")
 	newPath = strings.TrimSuffix(newPath, "/")
-	
+
 	// Get all subdirectories
 	dirs, err := s.vfsRepo.ListDirectoriesByPath(bucket, oldPath+"/")
 	if err != nil {
@@ -557,15 +557,15 @@ func (s *Service) ensureDirectoryPath(bucket, path string) (*types.VirtualDirect
 func normalizePath(path string) string {
 	// Clean the path
 	path = filepath.Clean("/" + path)
-	
+
 	// Ensure it starts with /
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
-	
+
 	// Ensure directories end with /
 	// Files should not end with /
-	
+
 	return path
 }
 
@@ -573,12 +573,12 @@ func normalizePath(path string) string {
 func splitPath(path string) (string, string) {
 	path = strings.TrimSuffix(path, "/")
 	dir, file := filepath.Split(path)
-	
+
 	if dir == "" {
 		dir = "/"
 	} else {
 		dir = strings.TrimSuffix(dir, "/")
 	}
-	
+
 	return dir, file
 }

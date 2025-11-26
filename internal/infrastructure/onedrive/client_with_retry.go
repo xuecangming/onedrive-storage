@@ -12,9 +12,9 @@ import (
 
 // ClientWithRetry wraps OneDrive client with retry logic
 type ClientWithRetry struct {
-	client       *Client
-	retryConfig  *retry.Config
-	logger       logger.Logger
+	client      *Client
+	retryConfig *retry.Config
+	logger      logger.Logger
 }
 
 // NewClientWithRetry creates a new OneDrive client with retry support

@@ -24,10 +24,10 @@ const (
 
 // Balancer handles account selection for load balancing
 type Balancer struct {
-	strategy      Strategy
-	currentIndex  int
-	mu            sync.Mutex
-	rand          *rand.Rand
+	strategy     Strategy
+	currentIndex int
+	mu           sync.Mutex
+	rand         *rand.Rand
 }
 
 // NewBalancer creates a new load balancer
@@ -150,10 +150,10 @@ func (b *Balancer) selectWeighted(accounts []*types.StorageAccount) *types.Stora
 func (b *Balancer) GetUsageStats(accounts []*types.StorageAccount) map[string]interface{} {
 	if len(accounts) == 0 {
 		return map[string]interface{}{
-			"total_accounts": 0,
+			"total_accounts":  0,
 			"active_accounts": 0,
-			"total_space": 0,
-			"used_space": 0,
+			"total_space":     0,
+			"used_space":      0,
 			"available_space": 0,
 		}
 	}
@@ -170,11 +170,11 @@ func (b *Balancer) GetUsageStats(accounts []*types.StorageAccount) map[string]in
 	}
 
 	return map[string]interface{}{
-		"total_accounts":   len(accounts),
-		"active_accounts":  activeCount,
-		"total_space":      totalSpace,
-		"used_space":       usedSpace,
-		"available_space":  totalSpace - usedSpace,
-		"usage_percent":    float64(usedSpace) / float64(totalSpace) * 100,
+		"total_accounts":  len(accounts),
+		"active_accounts": activeCount,
+		"total_space":     totalSpace,
+		"used_space":      usedSpace,
+		"available_space": totalSpace - usedSpace,
+		"usage_percent":   float64(usedSpace) / float64(totalSpace) * 100,
 	}
 }
