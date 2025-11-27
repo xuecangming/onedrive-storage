@@ -346,6 +346,11 @@ func (r *EnhancedVFSRepository) SearchFilesByType(bucket, fileType string, limit
 		limit = 50
 	}
 	
+	// For document type, we need a more complex query to match multiple MIME types
+	if fileType == "document" {
+		return r.searchDocumentFiles(bucket, limit)
+	}
+	
 	var mimePattern string
 	switch fileType {
 	case "image":
@@ -354,8 +359,6 @@ func (r *EnhancedVFSRepository) SearchFilesByType(bucket, fileType string, limit
 		mimePattern = "video/%"
 	case "audio":
 		mimePattern = "audio/%"
-	case "document":
-		mimePattern = "application/pdf%"
 	default:
 		mimePattern = fileType + "%"
 	}
@@ -369,6 +372,46 @@ func (r *EnhancedVFSRepository) SearchFilesByType(bucket, fileType string, limit
 	`
 	
 	rows, err := r.db.Query(query, bucket, mimePattern, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []types.SearchResult
+	for rows.Next() {
+		var result types.SearchResult
+		err := rows.Scan(&result.ID, &result.Name, &result.Path, &result.Type, &result.Size, &result.MimeType, &result.CreatedAt, &result.MatchType)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
+}
+
+// searchDocumentFiles searches for document files (PDF, Word, Excel, PowerPoint, text, etc.)
+func (r *EnhancedVFSRepository) searchDocumentFiles(bucket string, limit int) ([]types.SearchResult, error) {
+	query := `
+		SELECT id, name, full_path, 'file' as type, size, mime_type, created_at, 'type' as match_type
+		FROM virtual_files
+		WHERE bucket = $1 AND (
+			mime_type LIKE 'application/pdf%' OR
+			mime_type LIKE 'application/msword%' OR
+			mime_type LIKE 'application/vnd.openxmlformats-officedocument%' OR
+			mime_type LIKE 'application/vnd.ms-excel%' OR
+			mime_type LIKE 'application/vnd.ms-powerpoint%' OR
+			mime_type LIKE 'text/%' OR
+			name LIKE '%.doc' OR name LIKE '%.docx' OR
+			name LIKE '%.xls' OR name LIKE '%.xlsx' OR
+			name LIKE '%.ppt' OR name LIKE '%.pptx' OR
+			name LIKE '%.pdf' OR name LIKE '%.txt' OR
+			name LIKE '%.md' OR name LIKE '%.csv'
+		)
+		ORDER BY created_at DESC
+		LIMIT $2
+	`
+	
+	rows, err := r.db.Query(query, bucket, limit)
 	if err != nil {
 		return nil, err
 	}

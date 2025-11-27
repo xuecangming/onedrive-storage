@@ -858,6 +858,7 @@ class CloudStorageApp {
             this.updateBreadcrumb(); // Update to show search context
         } catch (error) {
             console.error('Search failed:', error);
+            this.hideLoading();
             // Fall back to client-side filtering
             const filtered = this.items.filter(item => 
                 item.name.toLowerCase().includes(query.toLowerCase())
