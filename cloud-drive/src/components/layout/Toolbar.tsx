@@ -48,8 +48,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ onNavigate, onUpload, onNewFolder }) 
     }),
   ];
 
-  const handleUpload = (info: { file: File }) => {
-    onUpload?.([info.file]);
+  const handleUpload = (file: File): false => {
+    onUpload?.([file]);
     return false; // Prevent default upload behavior
   };
 
@@ -59,7 +59,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ onNavigate, onUpload, onNewFolder }) 
       
       <Space className="toolbar-actions">
         <Upload
-          beforeUpload={handleUpload as never}
+          beforeUpload={handleUpload}
           showUploadList={false}
           multiple
         >

@@ -4,6 +4,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { Menu } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   FolderOpenOutlined,
   EyeOutlined,
@@ -69,53 +70,70 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   const isDirectory = item.type === 'directory';
   const canPreview = !isDirectory && getPreviewType(item.name, item.mime_type);
 
-  const menuItems = [
-    isDirectory && {
+  // Build menu items dynamically based on file type
+  const items: MenuProps['items'] = [];
+
+  if (isDirectory) {
+    items.push({
       key: 'open',
       icon: <FolderOpenOutlined />,
       label: '打开',
       onClick: () => { onOpen?.(); onClose(); },
-    },
-    canPreview && {
+    });
+  }
+
+  if (canPreview) {
+    items.push({
       key: 'preview',
       icon: <EyeOutlined />,
       label: '预览',
       onClick: () => { onPreview?.(); onClose(); },
-    },
-    !isDirectory && {
+    });
+  }
+
+  if (!isDirectory) {
+    items.push({
       key: 'download',
       icon: <DownloadOutlined />,
       label: '下载',
       onClick: () => { onDownload?.(); onClose(); },
-    },
-    { type: 'divider' },
-    {
-      key: 'rename',
-      icon: <EditOutlined />,
-      label: '重命名',
-      onClick: () => { onRename?.(); onClose(); },
-    },
-    {
-      key: 'move',
-      icon: <ScissorOutlined />,
-      label: '移动到',
-      onClick: () => { onMove?.(); onClose(); },
-    },
-    !isDirectory && {
+    });
+  }
+
+  items.push({ type: 'divider' });
+
+  items.push({
+    key: 'rename',
+    icon: <EditOutlined />,
+    label: '重命名',
+    onClick: () => { onRename?.(); onClose(); },
+  });
+
+  items.push({
+    key: 'move',
+    icon: <ScissorOutlined />,
+    label: '移动到',
+    onClick: () => { onMove?.(); onClose(); },
+  });
+
+  if (!isDirectory) {
+    items.push({
       key: 'copy',
       icon: <CopyOutlined />,
       label: '复制到',
       onClick: () => { onCopy?.(); onClose(); },
-    },
-    { type: 'divider' },
-    {
-      key: 'delete',
-      icon: <DeleteOutlined />,
-      label: '删除',
-      danger: true,
-      onClick: () => { onDelete?.(); onClose(); },
-    },
-  ].filter(Boolean);
+    });
+  }
+
+  items.push({ type: 'divider' });
+
+  items.push({
+    key: 'delete',
+    icon: <DeleteOutlined />,
+    label: '删除',
+    danger: true,
+    onClick: () => { onDelete?.(); onClose(); },
+  });
 
   // Adjust position to stay within viewport
   const adjustedX = Math.min(x, window.innerWidth - 180);
@@ -128,7 +146,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
       style={{ left: adjustedX, top: adjustedY }}
     >
       <Menu
-        items={menuItems as never}
+        items={items}
         mode="vertical"
         selectable={false}
       />
