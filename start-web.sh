@@ -14,13 +14,10 @@ echo "Web UI:     http://localhost:${PORT}"
 echo "API URL:    ${API_URL}"
 echo ""
 echo "Note: Make sure the middleware is running at ${API_URL}"
+echo ""
+echo "To configure API URL, edit web-app/index.html or set API_URL environment variable"
 echo "Press Ctrl+C to stop"
 echo ""
-
-# Update API URL in index.html if specified
-if [ -n "${API_URL}" ]; then
-    sed -i "s|window.API_BASE_URL = '.*'|window.API_BASE_URL = '${API_URL}'|g" web-app/index.html
-fi
 
 cd web-app
 

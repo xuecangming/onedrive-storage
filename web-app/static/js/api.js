@@ -2,12 +2,13 @@
  * API Client for OneDrive Cloud Storage
  * 
  * This web application is separate from the middleware.
- * Configure API_BASE to point to your middleware API endpoint.
+ * Configure API_BASE_URL in index.html to point to your middleware API endpoint.
  */
 
-// Configure the middleware API endpoint here
-// Default assumes middleware is running on the same host at port 8080
-const API_BASE = window.API_BASE_URL || 'http://localhost:8080/api/v1';
+// Configure the middleware API endpoint
+// Set window.API_BASE_URL in index.html before loading this script
+// For production, configure this to your actual middleware URL
+const API_BASE = window.API_BASE_URL || '/api/v1';
 
 class CloudAPI {
     constructor() {
