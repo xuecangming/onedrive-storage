@@ -2,10 +2,7 @@ package api
 
 import (
 	"database/sql"
-	"embed"
-	"io/fs"
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/xuecangming/onedrive-storage/internal/api/handlers"
@@ -17,9 +14,6 @@ import (
 	"github.com/xuecangming/onedrive-storage/internal/service/object"
 	"github.com/xuecangming/onedrive-storage/internal/service/vfs"
 )
-
-//go:embed web
-var webContent embed.FS
 
 // Server represents the HTTP server
 type Server struct {
@@ -144,41 +138,6 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vfs/{bucket}/_move", s.vfsHandler.Move).Methods("POST", "OPTIONS")
 	api.HandleFunc("/vfs/{bucket}/_copy", s.vfsHandler.Copy).Methods("POST", "OPTIONS")
 
-	// Serve static files for the web application
-	webFS, err := fs.Sub(webContent, "web")
-	if err == nil {
-		staticHandler := http.FileServer(http.FS(webFS))
-		
-		// Serve static files
-		s.router.PathPrefix("/static/").Handler(staticHandler)
-		
-		// Serve index.html for root and SPA fallback
-		s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			// Serve index.html
-			content, err := fs.ReadFile(webFS, "index.html")
-			if err != nil {
-				http.Error(w, "Not found", http.StatusNotFound)
-				return
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Write(content)
-		}).Methods("GET", "OPTIONS")
-		
-		// Catch-all for SPA routing (excluding API and static paths)
-		s.router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// If it's an API request, return 404
-			if strings.HasPrefix(r.URL.Path, s.config.Server.APIPrefix) {
-				http.NotFound(w, r)
-				return
-			}
-			// For all other paths, serve index.html (SPA fallback)
-			content, err := fs.ReadFile(webFS, "index.html")
-			if err != nil {
-				http.Error(w, "Not found", http.StatusNotFound)
-				return
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Write(content)
-		})
-	}
+	// Root endpoint - API info
+	s.router.HandleFunc("/", s.healthHandler.Info).Methods("GET", "OPTIONS")
 }

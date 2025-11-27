@@ -4,11 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>云盘 - OneDrive Cloud Storage</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="static/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Configure the middleware API endpoint (default: http://localhost:8080/api/v1) -->
+    <script>
+        // Set this to your middleware API URL
+        window.API_BASE_URL = 'http://localhost:8080/api/v1';
+    </script>
 </head>
 <body>
     <div class="app-container">
@@ -351,8 +356,8 @@
     <!-- Hidden file input for uploads -->
     <input type="file" id="fileInput" multiple style="display: none;">
 
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/utils.js"></script>
-    <script src="/static/js/app.js"></script>
+    <script src="static/js/api.js"></script>
+    <script src="static/js/utils.js"></script>
+    <script src="static/js/app.js"></script>
 </body>
 </html>
