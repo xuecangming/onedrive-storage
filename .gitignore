@@ -54,3 +54,6 @@ check_build.sh
 node_modules/
 cloud-drive/node_modules/
 cloud-drive/dist/
+
+# Built binary
+server

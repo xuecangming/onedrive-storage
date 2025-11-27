@@ -58,12 +58,27 @@ const FileCard: React.FC<FileCardProps> = ({
   const iconInfo = getFileIcon(item.type, item.name, item.mime_type);
   const icon = iconMap[iconInfo.icon] || iconMap['file'];
   
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClick?.(e);
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDoubleClick?.();
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onContextMenu?.(e);
+  };
+
   return (
     <Card
       className={`file-card ${selected ? 'selected' : ''}`}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
       hoverable
     >
       <div className="file-card-checkbox">
