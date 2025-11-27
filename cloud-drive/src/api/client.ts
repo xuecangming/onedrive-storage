@@ -8,8 +8,9 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosResponse } from 'axios';
 
-// Default API base URL - can be configured
-const DEFAULT_API_URL = 'http://localhost:8080/api/v1';
+// Default API base URL - use relative path to leverage Vite proxy
+// This works in Codespaces and local development
+const DEFAULT_API_URL = '/api/v1';
 
 // Get API URL from localStorage or use default
 const getApiBaseUrl = (): string => {
