@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneDrive 账号管理</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { opacity: 0.9; }
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        .add-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .add-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102,126,234,0.4); }
+        .account-list { margin-top: 20px; }
+        .account-item {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            transition: box-shadow 0.2s;
+        }
+        .account-item:hover { box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        .account-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #0078d4 0%, #00a4ef 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            margin-right: 15px;
+        }
+        .account-info { flex: 1; }
+        .account-name { font-weight: 600; font-size: 1.1em; color: #333; }
+        .account-email { color: #666; font-size: 0.9em; margin-top: 3px; }
+        .account-space { color: #888; font-size: 0.85em; margin-top: 5px; }
+        .account-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        .status-active { background: #d4edda; color: #155724; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .account-actions { margin-left: 15px; display: flex; gap: 8px; }
+        .action-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+        .auth-btn { background: #0078d4; color: white; }
+        .auth-btn:hover { background: #006cbd; }
+        .sync-btn { background: #28a745; color: white; }
+        .sync-btn:hover { background: #218838; }
+        .delete-btn { background: #dc3545; color: white; }
+        .delete-btn:hover { background: #c82333; }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .empty-state svg { width: 80px; height: 80px; opacity: 0.3; margin-bottom: 20px; }
+        .nav-links { margin-top: 20px; text-align: center; }
+        .nav-links a { color: white; margin: 0 15px; opacity: 0.8; }
+        .nav-links a:hover { opacity: 1; }
+        .progress-bar {
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>☁️ OneDrive 账号管理</h1>
+            <p>管理您的 OneDrive 存储账号</p>
+        </div>
+        
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📂 存储账号</h2>
+                <a href="/api/v1/oauth/create" class="add-btn">
+                    <span>➕</span> 添加账号
+                </a>
+            </div>
+            
+            <div class="account-list">
+                {{if .Accounts}}
+                {{range .Accounts}}
+                <div class="account-item">
+                    <div class="account-icon">📁</div>
+                    <div class="account-info">
+                        <div class="account-name">{{.Name}}</div>
+                        <div class="account-email">{{.Email}}</div>
+                        <div class="account-space">{{.SpaceInfo}}</div>
+                        <div class="progress-bar"><div class="progress-fill" style="width: {{.UsedPercent}}%"></div></div>
+                    </div>
+                    <span class="account-status {{.StatusClass}}">{{.StatusText}}</span>
+                    <div class="account-actions">
+                        <button class="action-btn auth-btn" onclick="location.href='/api/v1/oauth/authorize/{{.ID}}'">🔑 授权</button>
+                        <button class="action-btn sync-btn" onclick="syncAccount('{{.ID}}')">🔄 同步</button>
+                        <button class="action-btn delete-btn" onclick="deleteAccount('{{.ID}}')">🗑️</button>
+                    </div>
+                </div>
+                {{end}}
+                {{else}}
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                    <h3>暂无存储账号</h3>
+                    <p>点击上方按钮添加您的第一个 OneDrive 账号</p>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        
+        <div class="nav-links">
+            <a href="/">← 返回主页</a>
+            <a href="/api/v1/oauth/setup">📖 配置指南</a>
+        </div>
+    </div>
+    
+    <script>
+        async function syncAccount(id) {
+            try {
+                const resp = await fetch('/api/v1/accounts/' + id + '/sync', { method: 'POST' });
+                if (resp.ok) {
+                    alert('同步成功！');
+                    location.reload();
+                } else {
+                    alert('同步失败: ' + await resp.text());
+                }
+            } catch(e) {
+                alert('同步失败: ' + e.message);
+            }
+        }
+        
+        async function deleteAccount(id) {
+            if (!confirm('确定要删除此账号吗？')) return;
+            try {
+                const resp = await fetch('/api/v1/accounts/' + id, { method: 'DELETE' });
+                if (resp.ok) {
+                    location.reload();
+                } else {
+                    alert('删除失败: ' + await resp.text());
+                }
+            } catch(e) {
+                alert('删除失败: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
