@@ -953,11 +953,20 @@ class CloudStorageApp {
                     <div class="preview-unsupported">
                         <i class="fas fa-file"></i>
                         <p>该文件类型不支持预览</p>
-                        <button class="btn btn-primary" onclick="app.downloadFile(app.contextMenuItem)">
+                        <button class="btn btn-primary" id="previewDownloadFallbackBtn">
                             <i class="fas fa-download"></i> 下载文件
                         </button>
                     </div>
                 `;
+                // Add event listener for download button
+                const downloadBtn = document.getElementById('previewDownloadFallbackBtn');
+                if (downloadBtn) {
+                    downloadBtn.addEventListener('click', () => {
+                        if (this.contextMenuItem) {
+                            this.downloadFile(this.contextMenuItem);
+                        }
+                    });
+                }
         }
 
         this.showModal('previewModal');
@@ -990,11 +999,19 @@ class CloudStorageApp {
                         <div class="bucket-item-name">${Utils.escapeHtml(bucket.name)}</div>
                         <div class="bucket-item-info">${bucket.object_count || 0} 个文件 · ${Utils.formatSize(bucket.total_size || 0)}</div>
                     </div>
-                    <button class="action-btn danger" onclick="app.deleteBucket('${Utils.escapeHtml(bucket.name)}')" title="删除">
+                    <button class="action-btn danger bucket-delete-btn" data-bucket="${Utils.escapeHtml(bucket.name)}" title="删除">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
             `).join('');
+            
+            // Add event listeners for delete buttons
+            list.querySelectorAll('.bucket-delete-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const bucketName = btn.dataset.bucket;
+                    this.deleteBucket(bucketName);
+                });
+            });
         } catch (error) {
             list.innerHTML = '<p>加载失败</p>';
         }
@@ -1019,11 +1036,19 @@ class CloudStorageApp {
                             · ${account.status || 'unknown'}
                         </div>
                     </div>
-                    <button class="action-btn" onclick="app.syncAccount('${account.id}')" title="同步">
+                    <button class="action-btn account-sync-btn" data-account-id="${account.id}" title="同步">
                         <i class="fas fa-sync-alt"></i>
                     </button>
                 </div>
             `).join('');
+            
+            // Add event listeners for sync buttons
+            list.querySelectorAll('.account-sync-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const accountId = btn.dataset.accountId;
+                    this.syncAccount(accountId);
+                });
+            });
         } catch (error) {
             list.innerHTML = '<p>加载失败</p>';
         }
@@ -1121,10 +1146,16 @@ class CloudStorageApp {
         toast.innerHTML = `
             <i class="fas ${icons[type]} toast-icon"></i>
             <span class="toast-message">${Utils.escapeHtml(message)}</span>
-            <button class="toast-close" onclick="app.hideToast('${id}')">
+            <button class="toast-close" data-toast-id="${id}">
                 <i class="fas fa-times"></i>
             </button>
         `;
+        
+        // Add event listener for close button
+        const closeBtn = toast.querySelector('.toast-close');
+        closeBtn.addEventListener('click', () => {
+            this.hideToast(id);
+        });
 
         container.appendChild(toast);
 

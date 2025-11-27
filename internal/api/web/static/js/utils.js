@@ -49,6 +49,16 @@ const Utils = {
     },
 
     /**
+     * Get file extension from filename
+     */
+    getFileExtension(name) {
+        if (!name || typeof name !== 'string') return '';
+        const parts = name.split('.');
+        // Only return extension if file has one (more than one part)
+        return parts.length > 1 ? parts.pop().toLowerCase() : '';
+    },
+
+    /**
      * Get file icon class based on type or extension
      */
     getFileIcon(item) {
@@ -58,7 +68,7 @@ const Utils = {
 
         const name = item.name || '';
         const mimeType = item.mime_type || '';
-        const ext = name.split('.').pop().toLowerCase();
+        const ext = this.getFileExtension(name);
 
         // Image files
         if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico'].includes(ext)) {
@@ -116,7 +126,7 @@ const Utils = {
         
         const name = item.name || '';
         const mimeType = item.mime_type || '';
-        const ext = name.split('.').pop().toLowerCase();
+        const ext = this.getFileExtension(name);
 
         // Images
         if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)) {
@@ -182,7 +192,7 @@ const Utils = {
      * Generate unique ID
      */
     generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        return Date.now().toString(36) + Math.random().toString(36).substring(2);
     },
 
     /**
