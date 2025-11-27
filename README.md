@@ -79,6 +79,67 @@ curl http://localhost:8080/api/v1/vfs/{bucket}/path/
 # 创建目录
 curl -X POST http://localhost:8080/api/v1/vfs/{bucket}/_mkdir \
   -d '{"path": "/new-folder"}'
+
+# 移动文件
+curl -X POST http://localhost:8080/api/v1/vfs/{bucket}/_move \
+  -H "Content-Type: application/json" \
+  -d '{"source": "/old-path/file.txt", "destination": "/new-path/file.txt"}'
+
+# 复制文件
+curl -X POST http://localhost:8080/api/v1/vfs/{bucket}/_copy \
+  -H "Content-Type: application/json" \
+  -d '{"source": "/path/file.txt", "destination": "/copy/file.txt"}'
+```
+
+### 搜索
+
+```bash
+# 搜索文件
+curl "http://localhost:8080/api/v1/vfs/{bucket}/_search?q=关键词&limit=50"
+
+# 按类型搜索
+curl "http://localhost:8080/api/v1/vfs/{bucket}/_search?q=*&type=image"
+```
+
+### 收藏文件
+
+```bash
+# 获取收藏的文件
+curl http://localhost:8080/api/v1/vfs/{bucket}/_starred
+
+# 收藏文件
+curl -X POST http://localhost:8080/api/v1/vfs/{bucket}/_starred \
+  -H "Content-Type: application/json" \
+  -d '{"file_id": "uuid", "file_path": "/path/to/file"}'
+
+# 取消收藏
+curl -X DELETE http://localhost:8080/api/v1/vfs/{bucket}/_starred/{file_id}
+```
+
+### 最近文件
+
+```bash
+# 获取最近访问的文件
+curl "http://localhost:8080/api/v1/vfs/{bucket}/_files/recent?limit=20"
+
+# 按日期范围获取文件
+curl "http://localhost:8080/api/v1/vfs/{bucket}/_files/by-date?from=2024-01-01T00:00:00Z&to=2024-12-31T23:59:59Z"
+```
+
+### 回收站
+
+```bash
+# 获取回收站中的文件
+curl http://localhost:8080/api/v1/vfs/{bucket}/_trash
+
+# 恢复文件
+curl -X POST http://localhost:8080/api/v1/vfs/{bucket}/_trash/{trash_id}/restore
+
+# 永久删除
+curl -X DELETE http://localhost:8080/api/v1/vfs/{bucket}/_trash/{trash_id}
+
+# 清空回收站
+curl -X DELETE http://localhost:8080/api/v1/vfs/{bucket}/_trash
 ```
 
 ### 账号管理
@@ -242,7 +303,10 @@ go test ./...
 
 - 📁 **文件管理** - 上传、下载、删除、重命名、移动、复制文件
 - 📂 **文件夹操作** - 创建、删除、浏览文件夹
-- 🔍 **文件搜索** - 快速查找文件
+- 🔍 **智能搜索** - 服务端搜索支持，快速查找文件和文件夹
+- ⭐ **文件收藏** - 收藏重要文件，快速访问
+- 🕐 **最近文件** - 显示最近访问/上传的文件
+- 🗑️ **回收站** - 删除的文件暂存30天，支持恢复或永久删除
 - 👁️ **文件预览** - 支持图片、视频、音频、文本等格式预览
 - 📊 **存储统计** - 实时显示存储空间使用情况
 - 🎨 **现代界面** - 响应式设计，支持网格/列表视图切换

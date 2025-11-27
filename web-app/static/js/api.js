@@ -220,6 +220,79 @@ class CloudAPI {
     async syncAccount(id) {
         return this.request('POST', `/accounts/${id}/sync`);
     }
+
+    // ============================================
+    // Enhanced VFS Operations
+    // ============================================
+
+    // Search files and directories
+    async search(query, type = '', limit = 50) {
+        const bucket = this.currentBucket;
+        let url = `/vfs/${encodeURIComponent(bucket)}/_search?q=${encodeURIComponent(query)}&limit=${limit}`;
+        if (type) {
+            url += `&type=${encodeURIComponent(type)}`;
+        }
+        return this.request('GET', url);
+    }
+
+    // Get recent files
+    async getRecentFiles(limit = 20) {
+        const bucket = this.currentBucket;
+        return this.request('GET', `/vfs/${encodeURIComponent(bucket)}/_files/recent?limit=${limit}`);
+    }
+
+    // Get files by date range
+    async getFilesByDateRange(from, to, limit = 50) {
+        const bucket = this.currentBucket;
+        let url = `/vfs/${encodeURIComponent(bucket)}/_files/by-date?limit=${limit}`;
+        if (from) url += `&from=${encodeURIComponent(from)}`;
+        if (to) url += `&to=${encodeURIComponent(to)}`;
+        return this.request('GET', url);
+    }
+
+    // Get starred files
+    async getStarredFiles() {
+        const bucket = this.currentBucket;
+        return this.request('GET', `/vfs/${encodeURIComponent(bucket)}/_starred`);
+    }
+
+    // Star a file
+    async starFile(fileId, filePath) {
+        const bucket = this.currentBucket;
+        return this.request('POST', `/vfs/${encodeURIComponent(bucket)}/_starred`, {
+            body: { file_id: fileId, file_path: filePath }
+        });
+    }
+
+    // Unstar a file
+    async unstarFile(fileId) {
+        const bucket = this.currentBucket;
+        return this.request('DELETE', `/vfs/${encodeURIComponent(bucket)}/_starred/${encodeURIComponent(fileId)}`);
+    }
+
+    // Get trash items
+    async getTrashItems() {
+        const bucket = this.currentBucket;
+        return this.request('GET', `/vfs/${encodeURIComponent(bucket)}/_trash`);
+    }
+
+    // Restore from trash
+    async restoreFromTrash(trashId) {
+        const bucket = this.currentBucket;
+        return this.request('POST', `/vfs/${encodeURIComponent(bucket)}/_trash/${encodeURIComponent(trashId)}/restore`);
+    }
+
+    // Delete from trash permanently
+    async deleteFromTrash(trashId) {
+        const bucket = this.currentBucket;
+        return this.request('DELETE', `/vfs/${encodeURIComponent(bucket)}/_trash/${encodeURIComponent(trashId)}`);
+    }
+
+    // Empty trash
+    async emptyTrash() {
+        const bucket = this.currentBucket;
+        return this.request('DELETE', `/vfs/${encodeURIComponent(bucket)}/_trash`);
+    }
 }
 
 // Export singleton instance

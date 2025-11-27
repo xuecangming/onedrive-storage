@@ -199,4 +199,51 @@ type VFSItem struct {
 	MimeType  string     `json:"mime_type,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	IsStarred bool       `json:"is_starred,omitempty"`
+}
+
+// StarredFile represents a starred/favorited file
+type StarredFile struct {
+	ID        string    `json:"id"`
+	Bucket    string    `json:"bucket"`
+	FileID    string    `json:"file_id"`
+	FilePath  string    `json:"file_path"`
+	StarredAt time.Time `json:"starred_at"`
+}
+
+// TrashItem represents an item in the trash/recycle bin
+type TrashItem struct {
+	ID           string    `json:"id"`
+	Bucket       string    `json:"bucket"`
+	OriginalType string    `json:"original_type"` // "file" or "directory"
+	OriginalID   string    `json:"original_id"`
+	OriginalPath string    `json:"original_path"`
+	OriginalName string    `json:"original_name"`
+	ObjectKey    string    `json:"object_key,omitempty"`
+	Size         int64     `json:"size,omitempty"`
+	MimeType     string    `json:"mime_type,omitempty"`
+	DeletedAt    time.Time `json:"deleted_at"`
+	ExpiresAt    time.Time `json:"expires_at"`
+}
+
+// RecentFile represents a recently accessed file
+type RecentFile struct {
+	ID         string    `json:"id"`
+	Bucket     string    `json:"bucket"`
+	FileID     string    `json:"file_id"`
+	FilePath   string    `json:"file_path"`
+	FileName   string    `json:"file_name"`
+	AccessedAt time.Time `json:"accessed_at"`
+}
+
+// SearchResult represents a search result item
+type SearchResult struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Path      string    `json:"path"`
+	Type      string    `json:"type"`
+	Size      int64     `json:"size,omitempty"`
+	MimeType  string    `json:"mime_type,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	MatchType string    `json:"match_type"` // "name", "extension", etc.
 }

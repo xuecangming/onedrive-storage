@@ -17,16 +17,17 @@ import (
 
 // Server represents the HTTP server
 type Server struct {
-	config         *types.Config
-	db             *sql.DB
-	router         *mux.Router
-	bucketHandler  *handlers.BucketHandler
-	objectHandler  *handlers.ObjectHandler
-	accountHandler *handlers.AccountHandler
-	spaceHandler   *handlers.SpaceHandler
-	healthHandler  *handlers.HealthHandler
-	vfsHandler     *handlers.VFSHandler
-	oauthHandler   *handlers.OAuthHandler
+	config             *types.Config
+	db                 *sql.DB
+	router             *mux.Router
+	bucketHandler      *handlers.BucketHandler
+	objectHandler      *handlers.ObjectHandler
+	accountHandler     *handlers.AccountHandler
+	spaceHandler       *handlers.SpaceHandler
+	healthHandler      *handlers.HealthHandler
+	vfsHandler         *handlers.VFSHandler
+	oauthHandler       *handlers.OAuthHandler
+	enhancedVFSHandler *handlers.EnhancedVFSHandler
 }
 
 // NewServer creates a new HTTP server
@@ -36,6 +37,7 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	objectRepo := repository.NewObjectRepository(db)
 	accountRepo := repository.NewAccountRepository(db)
 	vfsRepo := repository.NewVFSRepository(db)
+	enhancedVFSRepo := repository.NewEnhancedVFSRepository(db)
 
 	// Create services
 	bucketService := bucket.NewService(bucketRepo)
@@ -43,6 +45,7 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	// Use OneDrive integration for real storage
 	objectService := object.NewServiceWithOneDrive(objectRepo, bucketRepo, accountService)
 	vfsService := vfs.NewService(vfsRepo, objectService, bucketRepo)
+	enhancedVFSService := vfs.NewEnhancedService(enhancedVFSRepo, vfsRepo, bucketRepo)
 
 	// Create handlers
 	bucketHandler := handlers.NewBucketHandler(bucketService)
@@ -51,21 +54,23 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	spaceHandler := handlers.NewSpaceHandler(accountService)
 	healthHandler := handlers.NewHealthHandler(db)
 	vfsHandler := handlers.NewVFSHandler(vfsService)
+	enhancedVFSHandler := handlers.NewEnhancedVFSHandler(enhancedVFSService)
 
 	// Create OAuth handler (redirect URI will be determined dynamically from request)
 	oauthHandler := handlers.NewOAuthHandler(accountService, config.Server.BaseURL)
 
 	server := &Server{
-		config:         config,
-		db:             db,
-		router:         mux.NewRouter(),
-		bucketHandler:  bucketHandler,
-		objectHandler:  objectHandler,
-		accountHandler: accountHandler,
-		spaceHandler:   spaceHandler,
-		healthHandler:  healthHandler,
-		vfsHandler:     vfsHandler,
-		oauthHandler:   oauthHandler,
+		config:             config,
+		db:                 db,
+		router:             mux.NewRouter(),
+		bucketHandler:      bucketHandler,
+		objectHandler:      objectHandler,
+		accountHandler:     accountHandler,
+		spaceHandler:       spaceHandler,
+		healthHandler:      healthHandler,
+		vfsHandler:         vfsHandler,
+		oauthHandler:       oauthHandler,
+		enhancedVFSHandler: enhancedVFSHandler,
 	}
 
 	server.setupRoutes()
@@ -137,6 +142,22 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vfs/{bucket}/_mkdir", s.vfsHandler.CreateDirectory).Methods("POST", "OPTIONS")
 	api.HandleFunc("/vfs/{bucket}/_move", s.vfsHandler.Move).Methods("POST", "OPTIONS")
 	api.HandleFunc("/vfs/{bucket}/_copy", s.vfsHandler.Copy).Methods("POST", "OPTIONS")
+
+	// Enhanced VFS routes - Search
+	api.HandleFunc("/vfs/{bucket}/_search", s.enhancedVFSHandler.Search).Methods("GET", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_files/recent", s.enhancedVFSHandler.GetRecentFiles).Methods("GET", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_files/by-date", s.enhancedVFSHandler.GetFilesByDateRange).Methods("GET", "OPTIONS")
+
+	// Enhanced VFS routes - Starred files
+	api.HandleFunc("/vfs/{bucket}/_starred", s.enhancedVFSHandler.GetStarredFiles).Methods("GET", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_starred", s.enhancedVFSHandler.StarFile).Methods("POST", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_starred/{file_id}", s.enhancedVFSHandler.UnstarFile).Methods("DELETE", "OPTIONS")
+
+	// Enhanced VFS routes - Trash
+	api.HandleFunc("/vfs/{bucket}/_trash", s.enhancedVFSHandler.GetTrashItems).Methods("GET", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_trash", s.enhancedVFSHandler.EmptyTrash).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_trash/{trash_id}/restore", s.enhancedVFSHandler.RestoreFromTrash).Methods("POST", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_trash/{trash_id}", s.enhancedVFSHandler.DeleteFromTrash).Methods("DELETE", "OPTIONS")
 
 	// Root endpoint - API info
 	s.router.HandleFunc("/", s.healthHandler.Info).Methods("GET", "OPTIONS")

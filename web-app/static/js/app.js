@@ -6,6 +6,7 @@ class CloudStorageApp {
     constructor() {
         this.currentPath = '/';
         this.currentView = 'grid'; // 'grid' or 'list'
+        this.currentNavView = 'files'; // 'files', 'recent', 'starred', 'trash'
         this.selectedItems = new Set();
         this.clipboard = null; // { action: 'copy'|'move', items: [...] }
         this.contextMenuItem = null;
@@ -113,12 +114,25 @@ class CloudStorageApp {
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 const view = e.currentTarget.dataset.view;
-                if (view === 'files') {
-                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-                    e.currentTarget.classList.add('active');
-                    this.loadDirectory('/');
-                } else {
-                    this.showToast('info', '该功能即将推出');
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                this.currentNavView = view;
+                
+                switch(view) {
+                    case 'files':
+                        this.loadDirectory('/');
+                        break;
+                    case 'recent':
+                        this.loadRecentFiles();
+                        break;
+                    case 'starred':
+                        this.loadStarredFiles();
+                        break;
+                    case 'trash':
+                        this.loadTrashItems();
+                        break;
+                    default:
+                        this.loadDirectory('/');
                 }
             });
         });
@@ -482,6 +496,7 @@ class CloudStorageApp {
     async loadDirectory(path) {
         this.showLoading();
         this.clearSelection();
+        this.currentNavView = 'files';
 
         try {
             const response = await api.listDirectory(path);
@@ -494,6 +509,99 @@ class CloudStorageApp {
             this.showToast('error', '加载目录失败: ' + error.message);
             this.hideLoading();
         }
+    }
+
+    async loadRecentFiles() {
+        this.showLoading();
+        this.clearSelection();
+        this.currentNavView = 'recent';
+
+        try {
+            const response = await api.getRecentFiles(50);
+            this.items = response.items || [];
+            this.currentPath = '/'; // Reset path for recent view
+            this.renderFileList();
+            this.updateBreadcrumbForView('最近文件');
+        } catch (error) {
+            console.error('Failed to load recent files:', error);
+            this.showToast('error', '加载最近文件失败: ' + error.message);
+            this.hideLoading();
+        }
+    }
+
+    async loadStarredFiles() {
+        this.showLoading();
+        this.clearSelection();
+        this.currentNavView = 'starred';
+
+        try {
+            const response = await api.getStarredFiles();
+            this.items = response.items || [];
+            this.currentPath = '/'; // Reset path for starred view
+            this.renderFileList();
+            this.updateBreadcrumbForView('收藏文件');
+        } catch (error) {
+            console.error('Failed to load starred files:', error);
+            this.showToast('error', '加载收藏文件失败: ' + error.message);
+            this.hideLoading();
+        }
+    }
+
+    async loadTrashItems() {
+        this.showLoading();
+        this.clearSelection();
+        this.currentNavView = 'trash';
+
+        try {
+            const response = await api.getTrashItems();
+            const trashItems = response.items || [];
+            
+            // Convert trash items to VFSItem format for display
+            this.items = trashItems.map(item => ({
+                id: item.id,
+                name: item.original_name,
+                path: item.original_path,
+                type: item.original_type,
+                size: item.size,
+                mime_type: item.mime_type,
+                created_at: item.deleted_at,
+                is_trash: true,
+                expires_at: item.expires_at
+            }));
+            
+            this.currentPath = '/'; // Reset path for trash view
+            this.renderFileList();
+            this.updateBreadcrumbForView('回收站');
+        } catch (error) {
+            console.error('Failed to load trash:', error);
+            this.showToast('error', '加载回收站失败: ' + error.message);
+            this.hideLoading();
+        }
+    }
+
+    updateBreadcrumbForView(viewName) {
+        const breadcrumb = document.getElementById('breadcrumb');
+        breadcrumb.innerHTML = `
+            <span class="breadcrumb-item" data-path="/">
+                <i class="fas fa-home"></i>
+            </span>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-item active">
+                ${Utils.escapeHtml(viewName)}
+            </span>
+        `;
+        
+        // Bind click events
+        breadcrumb.querySelectorAll('.breadcrumb-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (!item.classList.contains('active') && item.dataset.path) {
+                    this.loadDirectory(item.dataset.path);
+                    // Update nav items
+                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                    document.querySelector('.nav-item[data-view="files"]')?.classList.add('active');
+                }
+            });
+        });
     }
 
     showLoading() {
@@ -709,26 +817,56 @@ class CloudStorageApp {
     // Search
     // ============================================
 
-    handleSearch(query) {
+    async handleSearch(query) {
         if (!query) {
-            this.loadDirectory(this.currentPath); // Reload to reset
+            // Reload based on current view
+            switch(this.currentNavView) {
+                case 'files':
+                    this.loadDirectory(this.currentPath);
+                    break;
+                case 'recent':
+                    this.loadRecentFiles();
+                    break;
+                case 'starred':
+                    this.loadStarredFiles();
+                    break;
+                case 'trash':
+                    this.loadTrashItems();
+                    break;
+            }
             return;
         }
 
-        // Client-side filtering for now
-        // Ideally this should be a server-side search API
-        const filtered = this.items.filter(item => 
-            item.name.toLowerCase().includes(query.toLowerCase())
-        );
-
-        // We temporarily replace items for rendering, but we should probably keep original items
-        // For simplicity, let's just filter what we have. 
-        // A better approach would be to have a separate 'displayItems' list.
-        
-        // Re-render with filtered items
-        const fileGrid = document.getElementById('fileGrid');
-        fileGrid.innerHTML = filtered.map((item, index) => this.renderFileItem(item, index)).join('');
-        this.bindFileItemEvents();
+        // Use server-side search API
+        try {
+            this.showLoading();
+            const response = await api.search(query);
+            const results = response.results || [];
+            
+            // Convert search results to VFSItem format
+            this.items = results.map(r => ({
+                id: r.id,
+                name: r.name,
+                path: r.path,
+                type: r.type,
+                size: r.size,
+                mime_type: r.mime_type,
+                created_at: r.created_at
+            }));
+            
+            this.renderFileList();
+            this.updateBreadcrumb(); // Update to show search context
+        } catch (error) {
+            console.error('Search failed:', error);
+            // Fall back to client-side filtering
+            const filtered = this.items.filter(item => 
+                item.name.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            const fileGrid = document.getElementById('fileGrid');
+            fileGrid.innerHTML = filtered.map((item, index) => this.renderFileItem(item, index)).join('');
+            this.bindFileItemEvents();
+        }
     }
 
     // ============================================
@@ -757,11 +895,49 @@ class CloudStorageApp {
             menu.style.top = (y - menuRect.height) + 'px';
         }
 
-        // Show/hide appropriate options
+        // Show/hide appropriate options based on view and item type
         const isDirectory = item.type === 'directory';
-        menu.querySelector('[data-action="open"]').style.display = isDirectory ? 'flex' : 'none';
-        menu.querySelector('[data-action="preview"]').style.display = !isDirectory && Utils.isPreviewable(item) ? 'flex' : 'none';
-        menu.querySelector('[data-action="download"]').style.display = !isDirectory ? 'flex' : 'none';
+        const isTrash = this.currentNavView === 'trash';
+        const isFile = item.type === 'file';
+        
+        // For trash view, show different options
+        if (isTrash) {
+            menu.querySelector('[data-action="open"]').style.display = 'none';
+            menu.querySelector('[data-action="preview"]').style.display = 'none';
+            menu.querySelector('[data-action="download"]').style.display = 'none';
+            menu.querySelector('[data-action="rename"]').style.display = 'none';
+            menu.querySelector('[data-action="move"]').style.display = 'none';
+            menu.querySelector('[data-action="copy"]').style.display = 'none';
+            menu.querySelector('[data-action="delete"]').style.display = 'flex'; // Permanent delete
+            menu.querySelector('[data-action="star"]')?.style.setProperty('display', 'none');
+            
+            // Show restore option (we'll need to add this to HTML)
+            const restoreItem = menu.querySelector('[data-action="restore"]');
+            if (restoreItem) restoreItem.style.display = 'flex';
+        } else {
+            menu.querySelector('[data-action="open"]').style.display = isDirectory ? 'flex' : 'none';
+            menu.querySelector('[data-action="preview"]').style.display = !isDirectory && Utils.isPreviewable(item) ? 'flex' : 'none';
+            menu.querySelector('[data-action="download"]').style.display = !isDirectory ? 'flex' : 'none';
+            menu.querySelector('[data-action="rename"]').style.display = 'flex';
+            menu.querySelector('[data-action="move"]').style.display = 'flex';
+            menu.querySelector('[data-action="copy"]').style.display = 'flex';
+            menu.querySelector('[data-action="delete"]').style.display = 'flex';
+            
+            // Update star option text based on item starred status
+            const starItem = menu.querySelector('[data-action="star"]');
+            if (starItem && isFile) {
+                starItem.style.display = 'flex';
+                const isStarred = item.is_starred || false;
+                starItem.querySelector('span').textContent = isStarred ? '取消收藏' : '收藏';
+                starItem.querySelector('i').className = isStarred ? 'fas fa-star' : 'far fa-star';
+            } else if (starItem) {
+                starItem.style.display = 'none'; // Can't star directories
+            }
+            
+            // Hide restore option
+            const restoreItem = menu.querySelector('[data-action="restore"]');
+            if (restoreItem) restoreItem.style.display = 'none';
+        }
     }
 
     hideContextMenu() {
@@ -797,9 +973,65 @@ class CloudStorageApp {
                 this.selectedItems.add(item.path);
                 this.showDeleteConfirmation();
                 break;
+            case 'star':
+                this.toggleStar(item);
+                break;
+            case 'restore':
+                this.restoreFromTrash(item);
+                break;
         }
 
         this.hideContextMenu();
+    }
+
+    // ==================== Star/Unstar ====================
+
+    async toggleStar(item) {
+        try {
+            if (item.is_starred) {
+                await api.unstarFile(item.id);
+                item.is_starred = false;
+                this.showToast('success', '已取消收藏');
+            } else {
+                await api.starFile(item.id, item.path);
+                item.is_starred = true;
+                this.showToast('success', '已添加到收藏');
+            }
+            
+            // If in starred view, reload
+            if (this.currentNavView === 'starred') {
+                this.loadStarredFiles();
+            }
+        } catch (error) {
+            console.error('Toggle star failed:', error);
+            this.showToast('error', '操作失败: ' + error.message);
+        }
+    }
+
+    // ==================== Trash Operations ====================
+
+    async restoreFromTrash(item) {
+        try {
+            await api.restoreFromTrash(item.id);
+            this.showToast('success', '已恢复文件');
+            this.loadTrashItems();
+        } catch (error) {
+            console.error('Restore from trash failed:', error);
+            this.showToast('error', '恢复失败: ' + error.message);
+        }
+    }
+
+    async emptyTrash() {
+        if (!confirm('确定要清空回收站吗？此操作无法撤销。')) return;
+        
+        try {
+            const result = await api.emptyTrash();
+            this.showToast('success', `已清空回收站，删除了 ${result.deleted_count || 0} 个项目`);
+            this.loadTrashItems();
+        } catch (error) {
+            console.error('Empty trash failed:', error);
+            this.showToast('error', '清空回收站失败: ' + error.message);
+        }
     }
 
     // ============================================

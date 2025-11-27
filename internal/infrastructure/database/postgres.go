@@ -45,6 +45,9 @@ func RunMigrations(db *sql.DB) error {
 		createObjectChunksTable,
 		createVirtualDirectoriesTable,
 		createVirtualFilesTable,
+		createStarredFilesTable,
+		createTrashTable,
+		createRecentFilesTable,
 		insertDummyAccount,
 	}
 
@@ -209,6 +212,68 @@ CREATE TABLE IF NOT EXISTS virtual_files (
 CREATE INDEX IF NOT EXISTS idx_vfile_bucket_path ON virtual_files(bucket, full_path);
 CREATE INDEX IF NOT EXISTS idx_vfile_directory ON virtual_files(directory_id);
 CREATE INDEX IF NOT EXISTS idx_vfile_object ON virtual_files(bucket, object_key);
+`
+
+const createStarredFilesTable = `
+CREATE TABLE IF NOT EXISTS starred_files (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bucket          VARCHAR(63) NOT NULL,
+    file_id         UUID NOT NULL,
+    file_path       TEXT NOT NULL,
+    
+    starred_at      TIMESTAMP DEFAULT NOW(),
+    
+    FOREIGN KEY (bucket) REFERENCES buckets(name),
+    FOREIGN KEY (file_id) REFERENCES virtual_files(id) ON DELETE CASCADE,
+    UNIQUE(bucket, file_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_starred_bucket ON starred_files(bucket);
+CREATE INDEX IF NOT EXISTS idx_starred_file ON starred_files(file_id);
+`
+
+const createTrashTable = `
+CREATE TABLE IF NOT EXISTS trash (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bucket          VARCHAR(63) NOT NULL,
+    
+    original_type   VARCHAR(20) NOT NULL,  -- 'file' or 'directory'
+    original_id     UUID NOT NULL,
+    original_path   TEXT NOT NULL,
+    original_name   VARCHAR(255) NOT NULL,
+    
+    -- For files only
+    object_key      VARCHAR(1024),
+    size            BIGINT,
+    mime_type       VARCHAR(255),
+    
+    deleted_at      TIMESTAMP DEFAULT NOW(),
+    expires_at      TIMESTAMP DEFAULT NOW() + INTERVAL '30 days',
+    
+    FOREIGN KEY (bucket) REFERENCES buckets(name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_trash_bucket ON trash(bucket);
+CREATE INDEX IF NOT EXISTS idx_trash_expires ON trash(expires_at);
+CREATE INDEX IF NOT EXISTS idx_trash_deleted ON trash(deleted_at DESC);
+`
+
+const createRecentFilesTable = `
+CREATE TABLE IF NOT EXISTS recent_files (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bucket          VARCHAR(63) NOT NULL,
+    file_id         UUID NOT NULL,
+    file_path       TEXT NOT NULL,
+    file_name       VARCHAR(255) NOT NULL,
+    
+    accessed_at     TIMESTAMP DEFAULT NOW(),
+    
+    FOREIGN KEY (bucket) REFERENCES buckets(name),
+    UNIQUE(bucket, file_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_recent_bucket ON recent_files(bucket);
+CREATE INDEX IF NOT EXISTS idx_recent_accessed ON recent_files(accessed_at DESC);
 `
 
 const insertDummyAccount = `
