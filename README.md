@@ -158,6 +158,50 @@ database:
 
 中间件已启用 CORS，支持任意前端应用跨域访问。
 
+### CORS 配置
+
+默认允许所有来源。生产环境中，建议通过环境变量限制允许的来源：
+
+```bash
+# 限制 CORS 来源
+export CORS_ALLOWED_ORIGINS="https://your-domain.com, https://app.your-domain.com"
+```
+
+### 速率限制
+
+中间件支持 IP 级别的速率限制。在 API 路由中启用：
+
+```go
+import "github.com/xuecangming/onedrive-storage/internal/api/middleware"
+
+// 每秒允许 100 个请求
+router.Use(middleware.RateLimitMiddleware(100, time.Second))
+```
+
+### 流式传输 (HTTP Range 请求)
+
+API 支持 HTTP Range 请求，可用于：
+- **视频流播放** - 支持视频进度条拖拽
+- **断点续传** - 支持大文件分段下载
+- **音频流** - 支持音频进度控制
+
+使用示例：
+```bash
+# 获取文件前 1024 字节
+curl -H "Range: bytes=0-1023" http://localhost:8080/api/v1/objects/mybucket/video.mp4
+
+# 获取文件从第 1MB 开始的内容
+curl -H "Range: bytes=1048576-" http://localhost:8080/api/v1/objects/mybucket/video.mp4
+
+# 获取文件最后 1MB
+curl -H "Range: bytes=-1048576" http://localhost:8080/api/v1/objects/mybucket/video.mp4
+```
+
+HTML5 视频播放器会自动使用 Range 请求：
+```html
+<video src="http://localhost:8080/api/v1/objects/mybucket/video.mp4" controls></video>
+```
+
 示例 (JavaScript):
 ```javascript
 // 上传文件
@@ -168,6 +212,26 @@ const response = await fetch('http://localhost:8080/api/v1/objects/mybucket/test
 
 // 下载文件
 const data = await fetch('http://localhost:8080/api/v1/objects/mybucket/test.txt');
+
+// 断点续传 (Range 请求)
+const partialData = await fetch('http://localhost:8080/api/v1/objects/mybucket/largefile.zip', {
+  headers: { 'Range': 'bytes=0-1048575' }  // 获取第一个 1MB
+});
+```
+
+## 测试
+
+运行单元测试：
+
+```bash
+go test ./...
+```
+
+运行 API 测试：
+
+```bash
+./scripts/test_api.sh
+./scripts/test_vfs.sh
 ```
 
 ## License

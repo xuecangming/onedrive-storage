@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneDrive 配置指南</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { opacity: 0.9; font-size: 1.1em; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .step {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 30px;
+            margin-bottom: 25px;
+            position: relative;
+        }
+        .step-number {
+            position: absolute;
+            top: -15px;
+            left: 30px;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .step h2 { color: #333; margin-bottom: 15px; padding-top: 10px; }
+        .step ol { padding-left: 20px; color: #555; }
+        .step li { margin: 12px 0; }
+        .step a { color: #667eea; }
+        code {
+            background: #f0f2f5;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        pre code { background: none; color: inherit; }
+        .warning {
+            background: #fff8e6;
+            border-left: 4px solid #f6ad55;
+            padding: 20px;
+            border-radius: 0 10px 10px 0;
+            margin: 20px 0;
+        }
+        .warning h4 { color: #c05621; margin-bottom: 10px; }
+        .tip {
+            background: #e6fffa;
+            border-left: 4px solid #38b2ac;
+            padding: 20px;
+            border-radius: 0 10px 10px 0;
+            margin: 20px 0;
+        }
+        .tip h4 { color: #234e52; margin-bottom: 10px; }
+        .btn {
+            display: inline-block;
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        .actions { text-align: center; margin: 40px 0; }
+        .actions .btn { margin: 0 10px; }
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        .copy-btn:hover { background: #5a67d8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📘 OneDrive 配置指南</h1>
+        <p>按照以下步骤配置您的 Azure AD 应用</p>
+    </div>
+    
+    <div class="container">
+        <div class="step">
+            <div class="step-number">1</div>
+            <h2>🌐 创建 Azure AD 应用</h2>
+            <ol>
+                <li>访问 <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank">Azure Portal - 应用注册</a></li>
+                <li>点击 <strong>"+ 新注册"</strong> 按钮</li>
+                <li>填写应用名称，如 <code>OneDrive Storage</code></li>
+                <li>选择支持的账户类型（推荐选择 "任何组织目录中的账户和个人 Microsoft 账户"）</li>
+                <li>点击 <strong>"注册"</strong> 完成创建</li>
+            </ol>
+        </div>
+        
+        <div class="step">
+            <div class="step-number">2</div>
+            <h2>🔑 获取应用凭据</h2>
+            <ol>
+                <li>在应用概述页面，复制 <strong>应用程序(客户端) ID</strong> → 这是 Client ID</li>
+                <li>复制 <strong>目录(租户) ID</strong> → 这是 Tenant ID</li>
+                <li>进入左侧菜单 <strong>"证书和密码"</strong></li>
+                <li>点击 <strong>"+ 新客户端密码"</strong></li>
+                <li>设置描述和有效期，点击 <strong>"添加"</strong></li>
+                <li>⚠️ <strong>立即复制</strong>生成的密码值 → 这是 Client Secret（之后无法再次查看！）</li>
+            </ol>
+        </div>
+        
+        <div class="step">
+            <div class="step-number">3</div>
+            <h2>🔗 配置重定向 URI</h2>
+            <ol>
+                <li>进入左侧菜单 <strong>"身份验证"</strong></li>
+                <li>点击 <strong>"+ 添加平台"</strong> → 选择 <strong>"Web"</strong></li>
+                <li>在重定向 URI 中填入：</li>
+            </ol>
+            <pre><code>{{.RedirectURI}}</code><button class="copy-btn" onclick="copyToClipboard('{{.RedirectURI}}')">📋 复制</button></pre>
+            <li>点击 <strong>"配置"</strong> 保存</li>
+        </div>
+        
+        <div class="step">
+            <div class="step-number">4</div>
+            <h2>📋 配置 API 权限</h2>
+            <ol>
+                <li>进入左侧菜单 <strong>"API 权限"</strong></li>
+                <li>点击 <strong>"+ 添加权限"</strong> → 选择 <strong>"Microsoft Graph"</strong></li>
+                <li>选择 <strong>"委托的权限"</strong></li>
+                <li>搜索并勾选以下权限：
+                    <ul style="margin-top: 10px;">
+                        <li><code>Files.ReadWrite.All</code> - 读写所有文件</li>
+                        <li><code>offline_access</code> - 保持访问权限（刷新令牌）</li>
+                    </ul>
+                </li>
+                <li>点击 <strong>"添加权限"</strong></li>
+                <li>如果您是管理员，点击 <strong>"授予管理员同意"</strong></li>
+            </ol>
+        </div>
+        
+        <div class="step">
+            <div class="step-number">5</div>
+            <h2>✨ 添加账号到系统</h2>
+            <p>现在您已经准备好了所有必需的信息，可以添加 OneDrive 账号了！</p>
+            <div class="tip">
+                <h4>💡 您需要的信息</h4>
+                <ul>
+                    <li><strong>Client ID</strong> - 应用程序(客户端) ID</li>
+                    <li><strong>Client Secret</strong> - 刚才创建的客户端密码</li>
+                    <li><strong>Tenant ID</strong> - 目录(租户) ID，或使用 <code>common</code></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="warning">
+            <h4>⚠️ 重要提醒</h4>
+            <ul>
+                <li>Client Secret 请妥善保管，不要分享给他人</li>
+                <li>Access Token 有效期约 1 小时，系统会自动刷新</li>
+                <li>确保重定向 URI 与 Azure 配置完全一致</li>
+                <li>建议设置较长的 Client Secret 有效期（如 24 个月）</li>
+            </ul>
+        </div>
+        
+        <div class="actions">
+            <a href="/api/v1/oauth/create" class="btn">➕ 立即添加账号</a>
+            <a href="/api/v1/oauth/accounts" class="btn btn-secondary">📂 查看账号列表</a>
+        </div>
+    </div>
+    
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('已复制到剪贴板！');
+            });
+        }
+    </script>
+</body>
+</html>

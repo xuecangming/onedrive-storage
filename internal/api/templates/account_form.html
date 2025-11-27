@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>添加 OneDrive 账号</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #0078d4 0%, #00a4ef 100%);
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 35px;
+            margin-bottom: 15px;
+        }
+        .logo h1 { font-size: 1.5em; color: #333; }
+        .logo p { color: #666; font-size: 0.9em; margin-top: 5px; }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.2);
+        }
+        .form-group .hint {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 5px;
+        }
+        .form-group .hint a { color: #667eea; }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102,126,234,0.4);
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 25px 0;
+            color: #999;
+            font-size: 0.85em;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e1e5e9;
+        }
+        .divider span { padding: 0 15px; }
+        
+        .help-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .help-section h3 { font-size: 0.95em; color: #333; margin-bottom: 12px; }
+        .help-steps { font-size: 0.85em; color: #666; line-height: 1.8; }
+        .help-steps a { color: #667eea; text-decoration: none; }
+        .help-steps a:hover { text-decoration: underline; }
+        
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #667eea;
+            text-decoration: none;
+        }
+        .back-link:hover { text-decoration: underline; }
+        
+        .tenant-presets {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .preset-btn {
+            padding: 6px 12px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .preset-btn:hover { background: #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="logo">
+            <div class="logo-icon">☁️</div>
+            <h1>添加 OneDrive 账号</h1>
+            <p>连接您的 Microsoft 365 存储空间</p>
+        </div>
+        
+        <form method="POST" action="/api/v1/oauth/create">
+            <div class="form-group">
+                <label>📛 账号名称</label>
+                <input type="text" name="name" placeholder="如：主账号、备份账号" required>
+                <div class="hint">用于识别此存储账号的名称</div>
+            </div>
+            
+            <div class="form-group">
+                <label>📧 邮箱地址</label>
+                <input type="email" name="email" placeholder="your-email@outlook.com" required>
+                <div class="hint">OneDrive 账号对应的 Microsoft 邮箱</div>
+            </div>
+            
+            <div class="form-group">
+                <label>🔑 Client ID (客户端 ID)</label>
+                <input type="text" name="client_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+                <div class="hint">Azure AD 应用的客户端 ID，<a href="/api/v1/oauth/setup" target="_blank">查看获取方式</a></div>
+            </div>
+            
+            <div class="form-group">
+                <label>🔐 Client Secret (客户端密码)</label>
+                <input type="password" name="client_secret" placeholder="您的客户端密码" required>
+                <div class="hint">Azure AD 应用创建的客户端密码</div>
+            </div>
+            
+            <div class="form-group">
+                <label>🏢 Tenant ID (租户 ID)</label>
+                <input type="text" name="tenant_id" id="tenant_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+                <div class="hint">Azure AD 的租户 ID</div>
+                <div class="tenant-presets">
+                    <button type="button" class="preset-btn" onclick="document.getElementById('tenant_id').value='common'">通用 (common)</button>
+                    <button type="button" class="preset-btn" onclick="document.getElementById('tenant_id').value='organizations'">组织 (organizations)</button>
+                    <button type="button" class="preset-btn" onclick="document.getElementById('tenant_id').value='consumers'">个人 (consumers)</button>
+                </div>
+            </div>
+            
+            <button type="submit" class="submit-btn">🚀 创建并授权</button>
+        </form>
+        
+        <div class="divider"><span>需要帮助?</span></div>
+        
+        <div class="help-section">
+            <h3>📖 快速开始</h3>
+            <div class="help-steps">
+                1. 前往 <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank">Azure Portal</a> 创建应用<br>
+                2. 获取 Client ID 和 Tenant ID<br>
+                3. 创建 Client Secret<br>
+                4. 设置重定向 URI<br>
+                <a href="/api/v1/oauth/setup" target="_blank">📘 查看详细配置指南 →</a>
+            </div>
+        </div>
+        
+        <a href="/api/v1/oauth/accounts" class="back-link">← 返回账号列表</a>
+    </div>
+</body>
+</html>
