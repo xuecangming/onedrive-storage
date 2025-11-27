@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云盘 - OneDrive Cloud Storage</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Configure the middleware API endpoint (default: http://localhost:8080/api/v1) -->
+    <script>
+        // Set this to your middleware API URL
+        window.API_BASE_URL = 'http://localhost:8080/api/v1';
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-cloud"></i>
+                    <span>云盘</span>
+                </div>
+                <button class="sidebar-toggle" id="sidebarToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <ul class="nav-list">
+                    <li class="nav-item active" data-view="files">
+                        <i class="fas fa-folder"></i>
+                        <span>我的文件</span>
+                    </li>
+                    <li class="nav-item" data-view="recent">
+                        <i class="fas fa-clock"></i>
+                        <span>最近</span>
+                    </li>
+                    <li class="nav-item" data-view="starred">
+                        <i class="fas fa-star"></i>
+                        <span>收藏</span>
+                    </li>
+                    <li class="nav-item" data-view="trash">
+                        <i class="fas fa-trash"></i>
+                        <span>回收站</span>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="storage-info">
+                <div class="storage-header">
+                    <i class="fas fa-database"></i>
+                    <span>存储空间</span>
+                </div>
+                <div class="storage-bar">
+                    <div class="storage-used" id="storageBar"></div>
+                </div>
+                <div class="storage-text">
+                    <span id="storageUsed">0 GB</span> / <span id="storageTotal">0 GB</span>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="settings-btn" id="settingsBtn">
+                    <i class="fas fa-cog"></i>
+                    <span>设置</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <button class="mobile-menu-btn" id="mobileMenuBtn">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="search-container">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="search-input" placeholder="搜索文件..." id="searchInput">
+                    </div>
+                </div>
+                <div class="header-right">
+                    <button class="view-toggle" id="viewToggle" title="切换视图">
+                        <i class="fas fa-th-large"></i>
+                    </button>
+                    <button class="refresh-btn" id="refreshBtn" title="刷新">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <div class="user-menu" id="userMenu">
+                        <div class="user-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="breadcrumb" id="breadcrumb">
+                    <span class="breadcrumb-item" data-path="/">
+                        <i class="fas fa-home"></i>
+                    </span>
+                </div>
+                <div class="toolbar-actions">
+                    <button class="btn btn-primary" id="uploadBtn">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>上传</span>
+                    </button>
+                    <button class="btn btn-secondary" id="newFolderBtn">
+                        <i class="fas fa-folder-plus"></i>
+                        <span>新建文件夹</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Selection Actions Bar (hidden by default) -->
+            <div class="selection-bar" id="selectionBar">
+                <div class="selection-info">
+                    <span id="selectedCount">0</span> 个项目已选中
+                </div>
+                <div class="selection-actions">
+                    <button class="action-btn" id="downloadSelectedBtn" title="下载">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="action-btn" id="moveSelectedBtn" title="移动">
+                        <i class="fas fa-arrows-alt"></i>
+                    </button>
+                    <button class="action-btn" id="copySelectedBtn" title="复制">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                    <button class="action-btn danger" id="deleteSelectedBtn" title="删除">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="action-btn" id="cancelSelectionBtn" title="取消选择">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- File List Container -->
+            <div class="file-container" id="fileContainer">
+                <!-- Loading State -->
+                <div class="loading-state" id="loadingState">
+                    <div class="spinner"></div>
+                    <p>加载中...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state" id="emptyState" style="display: none;">
+                    <i class="fas fa-folder-open"></i>
+                    <h3>文件夹为空</h3>
+                    <p>拖拽文件到此处或点击上传按钮</p>
+                </div>
+
+                <!-- File Grid/List -->
+                <div class="file-grid" id="fileGrid"></div>
+            </div>
+
+            <!-- Drop Zone Overlay -->
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-content">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>拖放文件到此处上传</h3>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Upload Progress Panel -->
+    <div class="upload-panel" id="uploadPanel">
+        <div class="upload-panel-header">
+            <h4>上传任务</h4>
+            <button class="close-btn" id="closeUploadPanel">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="upload-list" id="uploadList"></div>
+    </div>
+
+    <!-- Modals -->
+    <!-- New Folder Modal -->
+    <div class="modal" id="newFolderModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>新建文件夹</h3>
+                <button class="close-btn modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="folderName">文件夹名称</label>
+                    <input type="text" id="folderName" class="form-input" placeholder="请输入文件夹名称">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close">取消</button>
+                <button class="btn btn-primary" id="createFolderBtn">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div class="modal" id="renameModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>重命名</h3>
+                <button class="close-btn modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newName">新名称</label>
+                    <input type="text" id="newName" class="form-input" placeholder="请输入新名称">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close">取消</button>
+                <button class="btn btn-primary" id="confirmRenameBtn">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>确认删除</h3>
+                <button class="close-btn modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteMessage">确定要删除选中的文件吗？此操作无法撤销。</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close">取消</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move/Copy Modal -->
+    <div class="modal" id="moveCopyModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="moveCopyTitle">移动到</h3>
+                <button class="close-btn modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="folder-tree" id="folderTree"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close">取消</button>
+                <button class="btn btn-primary" id="confirmMoveCopyBtn">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal preview-modal" id="previewModal">
+        <div class="preview-container">
+            <div class="preview-header">
+                <h3 id="previewFileName">文件预览</h3>
+                <div class="preview-actions">
+                    <button class="action-btn" id="previewDownloadBtn" title="下载">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="close-btn modal-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="preview-content" id="previewContent">
+                <!-- Preview content will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>设置</h3>
+                <button class="close-btn modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4>存储桶管理</h4>
+                    <div class="bucket-list" id="bucketList"></div>
+                    <div class="bucket-form">
+                        <input type="text" id="newBucketName" class="form-input" placeholder="新存储桶名称">
+                        <button class="btn btn-primary" id="createBucketBtn">创建</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h4>账号管理</h4>
+                    <div class="account-list" id="accountList"></div>
+                    <a href="/api/v1/oauth/create" class="btn btn-primary" target="_blank">
+                        <i class="fas fa-plus"></i> 添加账号
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <ul class="context-menu-list">
+            <li class="context-menu-item" data-action="open">
+                <i class="fas fa-folder-open"></i>
+                <span>打开</span>
+            </li>
+            <li class="context-menu-item" data-action="preview">
+                <i class="fas fa-eye"></i>
+                <span>预览</span>
+            </li>
+            <li class="context-menu-item" data-action="download">
+                <i class="fas fa-download"></i>
+                <span>下载</span>
+            </li>
+            <li class="context-menu-divider"></li>
+            <li class="context-menu-item" data-action="rename">
+                <i class="fas fa-pen"></i>
+                <span>重命名</span>
+            </li>
+            <li class="context-menu-item" data-action="move">
+                <i class="fas fa-arrows-alt"></i>
+                <span>移动到</span>
+            </li>
+            <li class="context-menu-item" data-action="copy">
+                <i class="fas fa-copy"></i>
+                <span>复制到</span>
+            </li>
+            <li class="context-menu-divider"></li>
+            <li class="context-menu-item danger" data-action="delete">
+                <i class="fas fa-trash"></i>
+                <span>删除</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Hidden file input for uploads -->
+    <input type="file" id="fileInput" multiple style="display: none;">
+
+    <script src="static/js/api.js"></script>
+    <script src="static/js/utils.js"></script>
+    <script src="static/js/app.js"></script>
+</body>
+</html>

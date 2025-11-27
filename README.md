@@ -234,6 +234,64 @@ go test ./...
 ./scripts/test_vfs.sh
 ```
 
+## Web 云盘应用
+
+本项目包含一个独立的 Web 云盘应用 (`web-app/`)，通过调用中间件 API 实现文件管理功能。
+
+### 功能特性
+
+- 📁 **文件管理** - 上传、下载、删除、重命名、移动、复制文件
+- 📂 **文件夹操作** - 创建、删除、浏览文件夹
+- 🔍 **文件搜索** - 快速查找文件
+- 👁️ **文件预览** - 支持图片、视频、音频、文本等格式预览
+- 📊 **存储统计** - 实时显示存储空间使用情况
+- 🎨 **现代界面** - 响应式设计，支持网格/列表视图切换
+- ⌨️ **快捷操作** - 支持拖拽上传、右键菜单、批量选择
+
+### 启动 Web 应用
+
+1. 首先确保中间件服务已启动：
+```bash
+./start.sh
+```
+
+2. 启动 Web 应用（默认端口 3000）：
+```bash
+./start-web.sh
+```
+
+3. 访问 Web 界面：`http://localhost:3000`
+
+### 配置 API 地址
+
+修改 `web-app/index.html` 中的 `API_BASE_URL` 来指定中间件 API 地址：
+
+```html
+<script>
+    window.API_BASE_URL = 'http://localhost:8080/api/v1';
+</script>
+```
+
+或者通过环境变量启动：
+```bash
+API_URL=http://your-middleware-host:8080/api/v1 ./start-web.sh
+```
+
+### 快捷键
+
+- `Ctrl/Cmd + A` - 全选
+- `Delete` - 删除选中项
+- `Escape` - 取消选择或关闭弹窗
+
+### 文件预览
+
+支持预览以下格式：
+- **图片**: jpg, jpeg, png, gif, bmp, webp, svg
+- **视频**: mp4, webm, ogg
+- **音频**: mp3, wav, ogg, m4a
+- **文档**: txt, md, json, xml, yaml, csv, 代码文件
+- **PDF**: 内嵌预览
+
 ## License
 
 MIT
