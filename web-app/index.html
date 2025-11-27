@@ -4,11 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>云盘 - OneDrive Cloud Storage</title>
-    <link rel="stylesheet" href="static/css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="static/css/style.css?v=2">
+    <!-- Use BootCDN for better access in China -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Use system fonts instead of Google Fonts for better performance -->
+    <style>
+        body {
+            font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, -apple-system, sans-serif !important;
+        }
+    </style>
     <!-- Configure the middleware API endpoint (default: http://localhost:8080/api/v1) -->
     <script>
         // Set this to your middleware API URL
@@ -24,7 +28,7 @@
                     <i class="fas fa-cloud"></i>
                     <span>云盘</span>
                 </div>
-                <button class="sidebar-toggle" id="sidebarToggle">
+                <button class="sidebar-toggle" id="sidebarToggle" style="display: none;">
                     <i class="fas fa-bars"></i>
                 </button>
             </div>
@@ -63,8 +67,8 @@
                 </div>
             </div>
 
-            <div class="sidebar-footer">
-                <button class="settings-btn" id="settingsBtn">
+            <div class="sidebar-footer" style="padding: 16px;">
+                <button class="btn btn-secondary" id="settingsBtn" style="width: 100%;">
                     <i class="fas fa-cog"></i>
                     <span>设置</span>
                 </button>
@@ -85,16 +89,16 @@
                     </div>
                 </div>
                 <div class="header-right">
-                    <button class="view-toggle" id="viewToggle" title="切换视图">
+                    <button class="icon-btn" id="viewToggle" title="切换视图">
                         <i class="fas fa-th-large"></i>
                     </button>
-                    <button class="refresh-btn" id="refreshBtn" title="刷新">
+                    <button class="icon-btn" id="refreshBtn" title="刷新">
                         <i class="fas fa-sync-alt"></i>
                     </button>
                     <div class="user-menu" id="userMenu">
-                        <div class="user-avatar">
-                            <i class="fas fa-user"></i>
-                        </div>
+                        <button class="icon-btn">
+                            <i class="fas fa-user-circle"></i>
+                        </button>
                     </div>
                 </div>
             </header>
@@ -124,19 +128,19 @@
                     <span id="selectedCount">0</span> 个项目已选中
                 </div>
                 <div class="selection-actions">
-                    <button class="action-btn" id="downloadSelectedBtn" title="下载">
+                    <button class="icon-btn" id="downloadSelectedBtn" title="下载">
                         <i class="fas fa-download"></i>
                     </button>
-                    <button class="action-btn" id="moveSelectedBtn" title="移动">
+                    <button class="icon-btn" id="moveSelectedBtn" title="移动">
                         <i class="fas fa-arrows-alt"></i>
                     </button>
-                    <button class="action-btn" id="copySelectedBtn" title="复制">
+                    <button class="icon-btn" id="copySelectedBtn" title="复制">
                         <i class="fas fa-copy"></i>
                     </button>
-                    <button class="action-btn danger" id="deleteSelectedBtn" title="删除">
+                    <button class="icon-btn" id="deleteSelectedBtn" title="删除">
                         <i class="fas fa-trash"></i>
                     </button>
-                    <button class="action-btn" id="cancelSelectionBtn" title="取消选择">
+                    <button class="icon-btn" id="cancelSelectionBtn" title="取消选择">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -168,6 +172,9 @@
                     <h3>拖放文件到此处上传</h3>
                 </div>
             </div>
+            
+            <!-- Selection Box -->
+            <div id="selectionBox" class="selection-box"></div>
         </main>
     </div>
 
@@ -175,7 +182,7 @@
     <div class="upload-panel" id="uploadPanel">
         <div class="upload-panel-header">
             <h4>上传任务</h4>
-            <button class="close-btn" id="closeUploadPanel">
+            <button class="icon-btn" id="closeUploadPanel" style="color: white;">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -188,7 +195,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>新建文件夹</h3>
-                <button class="close-btn modal-close">
+                <button class="icon-btn modal-close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -210,7 +217,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>重命名</h3>
-                <button class="close-btn modal-close">
+                <button class="icon-btn modal-close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -232,7 +239,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>确认删除</h3>
-                <button class="close-btn modal-close">
+                <button class="icon-btn modal-close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -251,12 +258,12 @@
         <div class="modal-content modal-large">
             <div class="modal-header">
                 <h3 id="moveCopyTitle">移动到</h3>
-                <button class="close-btn modal-close">
+                <button class="icon-btn modal-close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body">
-                <div class="folder-tree" id="folderTree"></div>
+                <div class="folder-tree" id="folderTree" style="max-height: 300px; overflow-y: auto;"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary modal-close">取消</button>
@@ -270,11 +277,11 @@
         <div class="preview-container">
             <div class="preview-header">
                 <h3 id="previewFileName">文件预览</h3>
-                <div class="preview-actions">
-                    <button class="action-btn" id="previewDownloadBtn" title="下载">
+                <div class="preview-actions" style="display: flex; gap: 8px;">
+                    <button class="icon-btn" id="previewDownloadBtn" title="下载">
                         <i class="fas fa-download"></i>
                     </button>
-                    <button class="close-btn modal-close">
+                    <button class="icon-btn modal-close">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -290,11 +297,24 @@
         <div class="modal-content modal-large">
             <div class="modal-header">
                 <h3>设置</h3>
-                <button class="close-btn modal-close">
+                <button class="icon-btn modal-close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body">
+                <div class="settings-section">
+                    <h4>系统设置</h4>
+                    <div class="form-group">
+                        <label for="apiBaseUrl">API 地址</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="apiBaseUrl" class="form-input" placeholder="http://localhost:8080/api/v1">
+                            <button class="btn btn-primary" id="saveApiUrlBtn">保存</button>
+                        </div>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                            修改后将自动刷新页面。当前地址: <span id="currentApiUrl"></span>
+                        </p>
+                    </div>
+                </div>
                 <div class="settings-section">
                     <h4>存储桶管理</h4>
                     <div class="bucket-list" id="bucketList"></div>
@@ -306,7 +326,7 @@
                 <div class="settings-section">
                     <h4>账号管理</h4>
                     <div class="account-list" id="accountList"></div>
-                    <a href="/api/v1/oauth/create" class="btn btn-primary" target="_blank">
+                    <a href="/api/v1/oauth/create" class="btn btn-primary" target="_blank" style="text-decoration: none; display: inline-flex;">
                         <i class="fas fa-plus"></i> 添加账号
                     </a>
                 </div>
@@ -316,38 +336,36 @@
 
     <!-- Context Menu -->
     <div class="context-menu" id="contextMenu">
-        <ul class="context-menu-list">
-            <li class="context-menu-item" data-action="open">
-                <i class="fas fa-folder-open"></i>
-                <span>打开</span>
-            </li>
-            <li class="context-menu-item" data-action="preview">
-                <i class="fas fa-eye"></i>
-                <span>预览</span>
-            </li>
-            <li class="context-menu-item" data-action="download">
-                <i class="fas fa-download"></i>
-                <span>下载</span>
-            </li>
-            <li class="context-menu-divider"></li>
-            <li class="context-menu-item" data-action="rename">
-                <i class="fas fa-pen"></i>
-                <span>重命名</span>
-            </li>
-            <li class="context-menu-item" data-action="move">
-                <i class="fas fa-arrows-alt"></i>
-                <span>移动到</span>
-            </li>
-            <li class="context-menu-item" data-action="copy">
-                <i class="fas fa-copy"></i>
-                <span>复制到</span>
-            </li>
-            <li class="context-menu-divider"></li>
-            <li class="context-menu-item danger" data-action="delete">
-                <i class="fas fa-trash"></i>
-                <span>删除</span>
-            </li>
-        </ul>
+        <div class="context-menu-item" data-action="open">
+            <i class="fas fa-folder-open"></i>
+            <span>打开</span>
+        </div>
+        <div class="context-menu-item" data-action="preview">
+            <i class="fas fa-eye"></i>
+            <span>预览</span>
+        </div>
+        <div class="context-menu-item" data-action="download">
+            <i class="fas fa-download"></i>
+            <span>下载</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" data-action="rename">
+            <i class="fas fa-pen"></i>
+            <span>重命名</span>
+        </div>
+        <div class="context-menu-item" data-action="move">
+            <i class="fas fa-arrows-alt"></i>
+            <span>移动到</span>
+        </div>
+        <div class="context-menu-item" data-action="copy">
+            <i class="fas fa-copy"></i>
+            <span>复制到</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item danger" data-action="delete">
+            <i class="fas fa-trash"></i>
+            <span>删除</span>
+        </div>
     </div>
 
     <!-- Toast Container -->

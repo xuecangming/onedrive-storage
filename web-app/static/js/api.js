@@ -6,9 +6,12 @@
  */
 
 // Configure the middleware API endpoint
-// Set window.API_BASE_URL in index.html before loading this script
-// For production, configure this to your actual middleware URL
-const API_BASE = window.API_BASE_URL || '/api/v1';
+// Priority: localStorage > window.API_BASE_URL > default
+const getApiBaseUrl = () => {
+    // Remove trailing slash if present
+    const url = localStorage.getItem('api_base_url') || window.API_BASE_URL || 'http://localhost:8080/api/v1';
+    return url.replace(/\/+$/, '');
+};
 
 class CloudAPI {
     constructor() {
@@ -22,6 +25,7 @@ class CloudAPI {
 
     // Generic request method
     async request(method, path, options = {}) {
+        const API_BASE = getApiBaseUrl();
         const url = `${API_BASE}${path}`;
         const config = {
             method,
@@ -62,6 +66,9 @@ class CloudAPI {
             return response.blob();
         } catch (error) {
             console.error('API Error:', error);
+            if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+                throw new Error('无法连接到服务器，请检查网络或 API 地址配置');
+            }
             throw error;
         }
     }
@@ -116,6 +123,7 @@ class CloudAPI {
     async uploadFile(path, file, onProgress) {
         const bucket = this.currentBucket;
         const encodedPath = path.split('/').map(p => encodeURIComponent(p)).join('/');
+        const API_BASE = getApiBaseUrl();
         const url = `${API_BASE}/vfs/${encodeURIComponent(bucket)}${encodedPath}`;
 
         return new Promise((resolve, reject) => {
@@ -153,6 +161,7 @@ class CloudAPI {
     async downloadFile(path) {
         const bucket = this.currentBucket;
         const encodedPath = path.split('/').map(p => encodeURIComponent(p)).join('/');
+        const API_BASE = getApiBaseUrl();
         const url = `${API_BASE}/vfs/${encodeURIComponent(bucket)}${encodedPath}`;
         
         const response = await fetch(url);
@@ -165,6 +174,7 @@ class CloudAPI {
     getFileUrl(path) {
         const bucket = this.currentBucket;
         const encodedPath = path.split('/').map(p => encodeURIComponent(p)).join('/');
+        const API_BASE = getApiBaseUrl();
         return `${API_BASE}/vfs/${encodeURIComponent(bucket)}${encodedPath}`;
     }
 
