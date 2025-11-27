@@ -158,6 +158,26 @@ database:
 
 中间件已启用 CORS，支持任意前端应用跨域访问。
 
+### CORS 配置
+
+默认允许所有来源。生产环境中，建议通过环境变量限制允许的来源：
+
+```bash
+# 限制 CORS 来源
+export CORS_ALLOWED_ORIGINS="https://your-domain.com, https://app.your-domain.com"
+```
+
+### 速率限制
+
+中间件支持 IP 级别的速率限制。在 API 路由中启用：
+
+```go
+import "github.com/xuecangming/onedrive-storage/internal/api/middleware"
+
+// 每秒允许 100 个请求
+router.Use(middleware.RateLimitMiddleware(100, time.Second))
+```
+
 示例 (JavaScript):
 ```javascript
 // 上传文件
@@ -168,6 +188,21 @@ const response = await fetch('http://localhost:8080/api/v1/objects/mybucket/test
 
 // 下载文件
 const data = await fetch('http://localhost:8080/api/v1/objects/mybucket/test.txt');
+```
+
+## 测试
+
+运行单元测试：
+
+```bash
+go test ./...
+```
+
+运行 API 测试：
+
+```bash
+./scripts/test_api.sh
+./scripts/test_vfs.sh
 ```
 
 ## License
