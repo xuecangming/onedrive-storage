@@ -1,0 +1,37 @@
+.selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background-color: #1677ff;
+  color: #fff;
+}
+
+.selection-count {
+  color: #fff;
+  font-weight: 500;
+}
+
+.selection-actions .ant-btn {
+  color: #fff;
+}
+
+.selection-actions .ant-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.selection-actions .ant-btn-dangerous {
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .selection-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .selection-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}

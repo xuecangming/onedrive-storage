@@ -49,3 +49,8 @@ data/
 
 # Temporary scripts
 check_build.sh
+
+# Node.js
+node_modules/
+cloud-drive/node_modules/
+cloud-drive/dist/

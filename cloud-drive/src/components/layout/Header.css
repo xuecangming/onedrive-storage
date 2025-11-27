@@ -1,0 +1,40 @@
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 48px;
+  background-color: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  max-width: 400px;
+  width: 100%;
+}
+
+.mobile-menu-btn {
+  display: none;
+  margin-right: 8px;
+}
+
+@media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: inline-flex;
+  }
+  
+  .search-input {
+    max-width: 200px;
+  }
+}
