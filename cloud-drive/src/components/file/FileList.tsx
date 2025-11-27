@@ -115,10 +115,17 @@ const FileList: React.FC<FileListProps> = ({
       pagination={false}
       size="middle"
       onRow={(record) => ({
-        onClick: () => onSelect?.(record.path, !selectedPaths.has(record.path)),
-        onDoubleClick: () => onDoubleClick?.(record),
+        onClick: (e) => {
+          e.stopPropagation();
+          onSelect?.(record.path, !selectedPaths.has(record.path));
+        },
+        onDoubleClick: (e) => {
+          e.stopPropagation();
+          onDoubleClick?.(record);
+        },
         onContextMenu: (e) => {
           e.preventDefault();
+          e.stopPropagation();
           onContextMenu?.(e, record);
         },
         className: selectedPaths.has(record.path) ? 'selected-row' : '',

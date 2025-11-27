@@ -18,12 +18,16 @@ import './Sidebar.css';
 
 const { Text } = Typography;
 
+export type ViewType = 'files' | 'recent' | 'starred' | 'trash';
+
 interface SidebarProps {
   collapsed?: boolean;
+  currentView?: ViewType;
+  onViewChange?: (view: ViewType) => void;
   onSettingsClick?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ collapsed, onSettingsClick }) => {
+const Sidebar: React.FC<SidebarProps> = ({ collapsed, currentView = 'files', onViewChange, onSettingsClick }) => {
   const spaceInfo = useAppStore(state => state.spaceInfo);
   
   const menuItems = [
@@ -36,19 +40,16 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onSettingsClick }) => {
       key: 'recent',
       icon: <ClockCircleOutlined />,
       label: '最近',
-      disabled: true,
     },
     {
       key: 'starred',
       icon: <StarOutlined />,
       label: '收藏',
-      disabled: true,
     },
     {
       key: 'trash',
       icon: <DeleteOutlined />,
       label: '回收站',
-      disabled: true,
     },
   ];
 
@@ -63,9 +64,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onSettingsClick }) => {
       
       <Menu
         mode="inline"
-        defaultSelectedKeys={['files']}
+        selectedKeys={[currentView]}
         items={menuItems}
         className="sidebar-menu"
+        onClick={({ key }) => onViewChange?.(key as ViewType)}
       />
       
       {!collapsed && spaceInfo && (

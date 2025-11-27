@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Layout, Modal, Input, message, TreeSelect } from 'antd';
 import { Sidebar, Header, Toolbar } from '../components/layout';
+import type { ViewType } from '../components/layout';
 import {
   FileGrid,
   FileList,
@@ -24,7 +25,8 @@ import {
   useUploadFiles,
 } from '../hooks';
 import { getSpaceOverview, downloadFile, listBuckets, createBucket, listDirectory } from '../api';
-import { setCurrentBucket } from '../api/vfs';
+import { setCurrentBucket, getCurrentBucket } from '../api/vfs';
+import apiClient from '../api/client';
 import type { FileItem, DirectoryListing } from '../types';
 import { normalizePath, joinPath, getParentPath, getPreviewType } from '../utils';
 import './FilesPage.css';
@@ -43,7 +45,9 @@ const FilesPage: React.FC = () => {
   const currentPath = useAppStore(state => state.currentPath);
   const setCurrentPath = useAppStore(state => state.setCurrentPath);
   const files = useAppStore(state => state.files);
+  const setFiles = useAppStore(state => state.setFiles);
   const isLoading = useAppStore(state => state.isLoading);
+  const setLoading = useAppStore(state => state.setLoading);
   const selectedPaths = useAppStore(state => state.selectedPaths);
   const setSelectedPaths = useAppStore(state => state.setSelectedPaths);
   const clearSelection = useAppStore(state => state.clearSelection);
@@ -53,6 +57,7 @@ const FilesPage: React.FC = () => {
 
   // Local state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [currentView, setCurrentView] = useState<ViewType>('files');
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
     x: number;
@@ -104,6 +109,64 @@ const FilesPage: React.FC = () => {
     };
     init();
   }, [setSpaceInfo]);
+
+  // Load data based on current view
+  const loadViewData = useCallback(async (view: ViewType) => {
+    const bucket = getCurrentBucket();
+    setLoading(true);
+    clearSelection();
+    
+    try {
+      switch (view) {
+        case 'files':
+          // Regular directory listing - handled by useDirectory hook
+          refetch();
+          break;
+        case 'recent':
+          // Load recent files from API
+          try {
+            const response = await apiClient.get(`/vfs/${encodeURIComponent(bucket)}/_files/recent?limit=50`);
+            setFiles(response.data.items || []);
+          } catch {
+            // If API not available, show empty
+            setFiles([]);
+            message.info('最近文件功能需要后端支持');
+          }
+          break;
+        case 'starred':
+          // Load starred files from API
+          try {
+            const response = await apiClient.get(`/vfs/${encodeURIComponent(bucket)}/_starred`);
+            setFiles(response.data.items || []);
+          } catch {
+            setFiles([]);
+            message.info('收藏功能需要后端支持');
+          }
+          break;
+        case 'trash':
+          // Load trash items from API
+          try {
+            const response = await apiClient.get(`/vfs/${encodeURIComponent(bucket)}/_trash`);
+            setFiles(response.data.items || []);
+          } catch {
+            setFiles([]);
+            message.info('回收站功能需要后端支持');
+          }
+          break;
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [refetch, setFiles, setLoading, clearSelection]);
+
+  // Handle view change from sidebar
+  const handleViewChange = useCallback((view: ViewType) => {
+    setCurrentView(view);
+    if (view === 'files') {
+      setCurrentPath('/');
+    }
+    loadViewData(view);
+  }, [loadViewData, setCurrentPath]);
 
   // Show upload panel when uploads exist - derive from state instead of using effect
   const shouldShowUploadPanel = uploadPanelVisible || uploads.size > 0;
@@ -333,6 +396,8 @@ const FilesPage: React.FC = () => {
       >
         <Sidebar
           collapsed={sidebarCollapsed}
+          currentView={currentView}
+          onViewChange={handleViewChange}
           onSettingsClick={() => setSettingsModalVisible(true)}
         />
       </Sider>
@@ -340,7 +405,7 @@ const FilesPage: React.FC = () => {
       <Layout className="files-main">
         <Header
           onSearch={setSearchQuery}
-          onRefresh={() => refetch()}
+          onRefresh={() => currentView === 'files' ? refetch() : loadViewData(currentView)}
           onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
 
