@@ -6,12 +6,14 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"log"
 
 	"github.com/xuecangming/onedrive-storage/internal/common/errors"
 	"github.com/xuecangming/onedrive-storage/internal/common/types"
 	"github.com/xuecangming/onedrive-storage/internal/common/utils"
 	"github.com/xuecangming/onedrive-storage/internal/core/loadbalancer"
 	"github.com/xuecangming/onedrive-storage/internal/infrastructure/onedrive"
+	"github.com/xuecangming/onedrive-storage/internal/infrastructure/storage"
 	"github.com/xuecangming/onedrive-storage/internal/repository"
 	"github.com/xuecangming/onedrive-storage/internal/service/account"
 )
@@ -22,30 +24,39 @@ type Service struct {
 	bucketRepo     *repository.BucketRepository
 	accountService *account.Service
 	balancer       *loadbalancer.Balancer
-	useOneDrive    bool              // Flag to enable/disable OneDrive
-	storage        map[string][]byte // In-memory storage fallback
+	useOneDrive    bool                   // Flag to enable/disable OneDrive
+	localStorage   *storage.LocalStorage  // Local file storage
 }
 
-// NewService creates a new object service
+// NewService creates a new object service with local file storage
 func NewService(objectRepo *repository.ObjectRepository, bucketRepo *repository.BucketRepository) *Service {
+	// Initialize local storage
+	localStorage, err := storage.NewLocalStorage("./data/storage")
+	if err != nil {
+		log.Printf("Warning: failed to initialize local storage: %v, using memory fallback", err)
+	}
+	
 	return &Service{
-		objectRepo:  objectRepo,
-		bucketRepo:  bucketRepo,
-		useOneDrive: false, // Keep using in-memory by default for backward compatibility
-		storage:     make(map[string][]byte),
-		balancer:    loadbalancer.NewBalancer(loadbalancer.StrategyLeastUsed),
+		objectRepo:   objectRepo,
+		bucketRepo:   bucketRepo,
+		useOneDrive:  false,
+		localStorage: localStorage,
+		balancer:     loadbalancer.NewBalancer(loadbalancer.StrategyLeastUsed),
 	}
 }
 
 // NewServiceWithOneDrive creates a new object service with OneDrive integration
 func NewServiceWithOneDrive(objectRepo *repository.ObjectRepository, bucketRepo *repository.BucketRepository, accountService *account.Service) *Service {
+	// Initialize local storage as fallback
+	localStorage, _ := storage.NewLocalStorage("./data/storage")
+	
 	return &Service{
 		objectRepo:     objectRepo,
 		bucketRepo:     bucketRepo,
 		accountService: accountService,
 		balancer:       loadbalancer.NewBalancer(loadbalancer.StrategyLeastUsed),
 		useOneDrive:    true,
-		storage:        make(map[string][]byte), // Fallback
+		localStorage:   localStorage,
 	}
 }
 
@@ -75,54 +86,69 @@ func (s *Service) Upload(ctx context.Context, bucket, key string, data []byte, m
 	etag := hex.EncodeToString(hash[:])
 
 	var accountID, remoteID, remotePath string
+	uploadedToOneDrive := false
 
-	// Upload to OneDrive if enabled
+	// Try to upload to OneDrive if enabled
 	if s.useOneDrive && s.accountService != nil {
 		// Get active accounts
 		accounts, err := s.accountService.GetActiveAccounts(ctx)
 		if err != nil {
-			return nil, err
+			log.Printf("Failed to get active accounts: %v", err)
+		} else if len(accounts) == 0 {
+			log.Printf("No active OneDrive accounts available, falling back to local storage")
+		} else {
+			// Select account using load balancer
+			account, err := s.balancer.SelectAccount(ctx, accounts, int64(len(data)))
+			if err != nil {
+				log.Printf("Failed to select account: %v, falling back to local storage", err)
+			} else {
+				// Ensure token is valid
+				if err := s.accountService.EnsureTokenValid(ctx, account.ID); err != nil {
+					log.Printf("Failed to ensure token valid for account %s: %v", account.ID, err)
+				} else {
+					// Get fresh account with updated token
+					account, err = s.accountService.Get(ctx, account.ID)
+					if err != nil {
+						log.Printf("Failed to get fresh account %s: %v", account.ID, err)
+					} else {
+						// Create OneDrive client
+						client := onedrive.NewClient(account.AccessToken)
+
+						// Upload file to OneDrive
+						path := fmt.Sprintf("%s/%s", bucket, key)
+						log.Printf("Uploading file to OneDrive: %s (size: %d bytes)", path, len(data))
+						item, err := client.UploadSmallFile(ctx, path, data)
+						if err != nil {
+							log.Printf("Failed to upload to OneDrive: %v", err)
+						} else {
+							log.Printf("Successfully uploaded to OneDrive: %s (ID: %s)", path, item.ID)
+							accountID = account.ID
+							remoteID = item.ID
+							remotePath = path
+							uploadedToOneDrive = true
+						}
+					}
+				}
+			}
 		}
+	}
 
-		// Select account using load balancer
-		account, err := s.balancer.SelectAccount(ctx, accounts, int64(len(data)))
-		if err != nil {
-			return nil, errors.StorageFull()
+	// Fallback to local storage if OneDrive upload failed or not enabled
+	if !uploadedToOneDrive {
+		if s.localStorage != nil {
+			// Store data in local file system
+			filePath, err := s.localStorage.Store(bucket, key, data)
+			if err != nil {
+				return nil, errors.InternalError(fmt.Sprintf("failed to store file: %v", err))
+			}
+
+			// Use dummy account for local storage
+			accountID = "00000000-0000-0000-0000-000000000000"
+			remoteID = "local-storage"
+			remotePath = filePath
+		} else {
+			return nil, errors.InternalError("no storage backend available")
 		}
-
-		// Ensure token is valid
-		if err := s.accountService.EnsureTokenValid(ctx, account.ID); err != nil {
-			return nil, err
-		}
-
-		// Get fresh account with updated token
-		account, err = s.accountService.Get(ctx, account.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		// Create OneDrive client
-		client := onedrive.NewClient(account.AccessToken)
-
-		// Upload file to OneDrive
-		path := fmt.Sprintf("%s/%s", bucket, key)
-		item, err := client.UploadSmallFile(ctx, path, data)
-		if err != nil {
-			return nil, errors.UpstreamError(err.Error())
-		}
-
-		accountID = account.ID
-		remoteID = item.ID
-		remotePath = path
-	} else {
-		// Store data in memory (Phase 1/2 - fallback)
-		storageKey := fmt.Sprintf("%s/%s", bucket, key)
-		s.storage[storageKey] = data
-
-		// Use dummy account for in-memory storage
-		accountID = "00000000-0000-0000-0000-000000000000"
-		remoteID = "dummy-remote"
-		remotePath = fmt.Sprintf("/storage/%s/%s", bucket, key)
 	}
 
 	// Create object metadata
@@ -191,14 +217,15 @@ func (s *Service) Download(ctx context.Context, bucket, key string) (*types.Obje
 		if err != nil {
 			return nil, nil, errors.UpstreamError(err.Error())
 		}
-	} else {
-		// Retrieve data from in-memory storage
-		storageKey := fmt.Sprintf("%s/%s", bucket, key)
-		var exists bool
-		data, exists = s.storage[storageKey]
-		if !exists {
+	} else if s.localStorage != nil {
+		// Retrieve data from local file storage
+		var err error
+		data, err = s.localStorage.Retrieve(bucket, key)
+		if err != nil {
 			return nil, nil, errors.ObjectNotFound(bucket, key)
 		}
+	} else {
+		return nil, nil, errors.InternalError("no storage backend available")
 	}
 
 	return obj, data, nil
@@ -254,10 +281,11 @@ func (s *Service) Delete(ctx context.Context, bucket, key string) error {
 		if err := client.DeleteFile(ctx, obj.RemoteID); err != nil {
 			return errors.UpstreamError(err.Error())
 		}
-	} else {
-		// Delete from in-memory storage
-		storageKey := fmt.Sprintf("%s/%s", bucket, key)
-		delete(s.storage, storageKey)
+	} else if s.localStorage != nil {
+		// Delete from local file storage
+		if err := s.localStorage.Delete(bucket, key); err != nil {
+			log.Printf("Warning: failed to delete local file: %v", err)
+		}
 	}
 
 	// Delete from database

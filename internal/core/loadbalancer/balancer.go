@@ -67,6 +67,11 @@ func (b *Balancer) filterAvailableAccounts(accounts []*types.StorageAccount, req
 	var available []*types.StorageAccount
 	for _, account := range accounts {
 		if account.Status == "active" {
+			// If TotalSpace is 0 (not synced yet), assume unlimited space
+			if account.TotalSpace == 0 {
+				available = append(available, account)
+				continue
+			}
 			availableSpace := account.TotalSpace - account.UsedSpace
 			if availableSpace >= requiredSpace {
 				available = append(available, account)
@@ -83,10 +88,16 @@ func (b *Balancer) selectLeastUsed(accounts []*types.StorageAccount) *types.Stor
 	}
 
 	selected := accounts[0]
-	minUsage := float64(selected.UsedSpace) / float64(selected.TotalSpace)
+	minUsage := 0.0
+	if selected.TotalSpace > 0 {
+		minUsage = float64(selected.UsedSpace) / float64(selected.TotalSpace)
+	}
 
 	for _, account := range accounts[1:] {
-		usage := float64(account.UsedSpace) / float64(account.TotalSpace)
+		usage := 0.0
+		if account.TotalSpace > 0 {
+			usage = float64(account.UsedSpace) / float64(account.TotalSpace)
+		}
 		if usage < minUsage {
 			minUsage = usage
 			selected = account

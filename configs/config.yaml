@@ -3,6 +3,9 @@ server:
   host: "0.0.0.0"
   port: 8080
   api_prefix: "/api/v1"
+  # OAuth 回调需要的外部访问地址 (留空则从请求头自动获取)
+  # 示例: https://your-domain.com 或 http://192.168.1.100:8080
+  base_url: ""
 
 # Database configuration
 database:
@@ -10,7 +13,7 @@ database:
   port: 5432
   name: "onedrive_storage"
   user: "postgres"
-  password: "${DB_PASSWORD}"
+  password: "postgres123"  # 或使用环境变量 ${DB_PASSWORD}
   max_connections: 20
 
 # Cache configuration

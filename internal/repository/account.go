@@ -53,8 +53,9 @@ func (r *AccountRepository) Create(ctx context.Context, account *types.StorageAc
 func (r *AccountRepository) Get(ctx context.Context, id string) (*types.StorageAccount, error) {
 	query := `
 		SELECT id, name, email, client_id, client_secret, tenant_id,
-		       refresh_token, access_token, token_expires,
-		       total_space, used_space, status, priority,
+		       COALESCE(refresh_token, ''), COALESCE(access_token, ''), token_expires,
+		       COALESCE(total_space, 0), COALESCE(used_space, 0), 
+		       COALESCE(status, 'pending'), COALESCE(priority, 0),
 		       last_sync, error_message, created_at, updated_at
 		FROM storage_accounts
 		WHERE id = $1
@@ -95,10 +96,12 @@ func (r *AccountRepository) Get(ctx context.Context, id string) (*types.StorageA
 func (r *AccountRepository) List(ctx context.Context) ([]*types.StorageAccount, error) {
 	query := `
 		SELECT id, name, email, client_id, client_secret, tenant_id,
-		       refresh_token, access_token, token_expires,
-		       total_space, used_space, status, priority,
+		       COALESCE(refresh_token, ''), COALESCE(access_token, ''), token_expires,
+		       COALESCE(total_space, 0), COALESCE(used_space, 0), 
+		       COALESCE(status, 'pending'), COALESCE(priority, 0),
 		       last_sync, error_message, created_at, updated_at
 		FROM storage_accounts
+		WHERE id != '00000000-0000-0000-0000-000000000000'
 		ORDER BY priority DESC, created_at ASC
 	`
 
@@ -234,11 +237,12 @@ func (r *AccountRepository) Delete(ctx context.Context, id string) error {
 func (r *AccountRepository) GetActiveAccounts(ctx context.Context) ([]*types.StorageAccount, error) {
 	query := `
 		SELECT id, name, email, client_id, client_secret, tenant_id,
-		       refresh_token, access_token, token_expires,
-		       total_space, used_space, status, priority,
+		       COALESCE(refresh_token, ''), COALESCE(access_token, ''), token_expires,
+		       COALESCE(total_space, 0), COALESCE(used_space, 0), 
+		       COALESCE(status, 'pending'), COALESCE(priority, 0),
 		       last_sync, error_message, created_at, updated_at
 		FROM storage_accounts
-		WHERE status = 'active'
+		WHERE status = 'active' AND id != '00000000-0000-0000-0000-000000000000'
 		ORDER BY priority DESC, used_space ASC
 	`
 
@@ -286,8 +290,9 @@ func (r *AccountRepository) GetActiveAccounts(ctx context.Context) ([]*types.Sto
 func (r *AccountRepository) GetAccountByEmail(ctx context.Context, email string) (*types.StorageAccount, error) {
 	query := `
 		SELECT id, name, email, client_id, client_secret, tenant_id,
-		       refresh_token, access_token, token_expires,
-		       total_space, used_space, status, priority,
+		       COALESCE(refresh_token, ''), COALESCE(access_token, ''), token_expires,
+		       COALESCE(total_space, 0), COALESCE(used_space, 0), 
+		       COALESCE(status, 'pending'), COALESCE(priority, 0),
 		       last_sync, error_message, created_at, updated_at
 		FROM storage_accounts
 		WHERE email = $1

@@ -3,8 +3,6 @@ package api
 import (
 	"database/sql"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"github.com/gorilla/mux"
 	"github.com/xuecangming/onedrive-storage/internal/api/handlers"
@@ -28,7 +26,7 @@ type Server struct {
 	spaceHandler   *handlers.SpaceHandler
 	healthHandler  *handlers.HealthHandler
 	vfsHandler     *handlers.VFSHandler
-	webHandler     *handlers.WebHandler
+	oauthHandler   *handlers.OAuthHandler
 }
 
 // NewServer creates a new HTTP server
@@ -42,7 +40,8 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	// Create services
 	bucketService := bucket.NewService(bucketRepo)
 	accountService := account.NewService(accountRepo)
-	objectService := object.NewService(objectRepo, bucketRepo)
+	// Use OneDrive integration for real storage
+	objectService := object.NewServiceWithOneDrive(objectRepo, bucketRepo, accountService)
 	vfsService := vfs.NewService(vfsRepo, objectService, bucketRepo)
 
 	// Create handlers
@@ -53,9 +52,8 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	healthHandler := handlers.NewHealthHandler(db)
 	vfsHandler := handlers.NewVFSHandler(vfsService)
 
-	// Create web handler with static directory
-	staticDir := getStaticDir()
-	webHandler := handlers.NewWebHandler(staticDir)
+	// Create OAuth handler (redirect URI will be determined dynamically from request)
+	oauthHandler := handlers.NewOAuthHandler(accountService, config.Server.BaseURL)
 
 	server := &Server{
 		config:         config,
@@ -67,42 +65,12 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 		spaceHandler:   spaceHandler,
 		healthHandler:  healthHandler,
 		vfsHandler:     vfsHandler,
-		webHandler:     webHandler,
+		oauthHandler:   oauthHandler,
 	}
 
 	server.setupRoutes()
 
 	return server
-}
-
-// getStaticDir returns the path to the static files directory
-func getStaticDir() string {
-	// Try to find the web/static directory relative to the executable
-	execPath, err := os.Executable()
-	if err == nil {
-		// Check relative to executable
-		dir := filepath.Join(filepath.Dir(execPath), "web", "static")
-		if _, err := os.Stat(dir); err == nil {
-			return dir
-		}
-		// Check parent directory (for development)
-		dir = filepath.Join(filepath.Dir(execPath), "..", "web", "static")
-		if _, err := os.Stat(dir); err == nil {
-			return dir
-		}
-	}
-
-	// Try current working directory
-	cwd, err := os.Getwd()
-	if err == nil {
-		dir := filepath.Join(cwd, "web", "static")
-		if _, err := os.Stat(dir); err == nil {
-			return dir
-		}
-	}
-
-	// Default fallback
-	return "web/static"
 }
 
 // Router returns the HTTP router
@@ -113,6 +81,7 @@ func (s *Server) Router() http.Handler {
 // setupRoutes sets up the HTTP routes
 func (s *Server) setupRoutes() {
 	// Apply global middleware
+	s.router.Use(middleware.CORSMiddleware)
 	s.router.Use(middleware.LoggingMiddleware)
 	s.router.Use(middleware.RecoveryMiddleware)
 
@@ -120,48 +89,55 @@ func (s *Server) setupRoutes() {
 	api := s.router.PathPrefix(s.config.Server.APIPrefix).Subrouter()
 
 	// Health check and readiness endpoints
-	api.HandleFunc("/health", s.healthHandler.Health).Methods("GET")
-	api.HandleFunc("/info", s.healthHandler.Info).Methods("GET")
-	api.HandleFunc("/ready", s.healthHandler.Ready).Methods("GET")
-	api.HandleFunc("/live", s.healthHandler.Live).Methods("GET")
+	api.HandleFunc("/health", s.healthHandler.Health).Methods("GET", "OPTIONS")
+	api.HandleFunc("/info", s.healthHandler.Info).Methods("GET", "OPTIONS")
+	api.HandleFunc("/ready", s.healthHandler.Ready).Methods("GET", "OPTIONS")
+	api.HandleFunc("/live", s.healthHandler.Live).Methods("GET", "OPTIONS")
 
 	// Bucket routes
-	api.HandleFunc("/buckets", s.bucketHandler.List).Methods("GET")
-	api.HandleFunc("/buckets/{bucket}", s.bucketHandler.Create).Methods("PUT")
-	api.HandleFunc("/buckets/{bucket}", s.bucketHandler.Delete).Methods("DELETE")
+	api.HandleFunc("/buckets", s.bucketHandler.List).Methods("GET", "OPTIONS")
+	api.HandleFunc("/buckets/{bucket}", s.bucketHandler.Create).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/buckets/{bucket}", s.bucketHandler.Delete).Methods("DELETE", "OPTIONS")
 
 	// Object routes
-	api.HandleFunc("/objects/{bucket}", s.objectHandler.List).Methods("GET")
-	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Upload).Methods("PUT")
-	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Download).Methods("GET")
-	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Head).Methods("HEAD")
-	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Delete).Methods("DELETE")
+	api.HandleFunc("/objects/{bucket}", s.objectHandler.List).Methods("GET", "OPTIONS")
+	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Upload).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Download).Methods("GET", "OPTIONS")
+	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Head).Methods("HEAD", "OPTIONS")
+	api.HandleFunc("/objects/{bucket}/{key}", s.objectHandler.Delete).Methods("DELETE", "OPTIONS")
 
 	// Account management routes
-	api.HandleFunc("/accounts", s.accountHandler.List).Methods("GET")
-	api.HandleFunc("/accounts", s.accountHandler.Create).Methods("POST")
-	api.HandleFunc("/accounts/{id}", s.accountHandler.Get).Methods("GET")
-	api.HandleFunc("/accounts/{id}", s.accountHandler.Update).Methods("PUT")
-	api.HandleFunc("/accounts/{id}", s.accountHandler.Delete).Methods("DELETE")
-	api.HandleFunc("/accounts/{id}/refresh", s.accountHandler.RefreshToken).Methods("POST")
-	api.HandleFunc("/accounts/{id}/sync", s.accountHandler.SyncSpace).Methods("POST")
+	api.HandleFunc("/accounts", s.accountHandler.List).Methods("GET", "OPTIONS")
+	api.HandleFunc("/accounts", s.accountHandler.Create).Methods("POST", "OPTIONS")
+	api.HandleFunc("/accounts/{id}", s.accountHandler.Get).Methods("GET", "OPTIONS")
+	api.HandleFunc("/accounts/{id}", s.accountHandler.Update).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/accounts/{id}", s.accountHandler.Delete).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/accounts/{id}/refresh", s.accountHandler.RefreshToken).Methods("POST", "OPTIONS")
+	api.HandleFunc("/accounts/{id}/sync", s.accountHandler.SyncSpace).Methods("POST", "OPTIONS")
 
 	// Space management routes
-	api.HandleFunc("/space", s.spaceHandler.Overview).Methods("GET")
-	api.HandleFunc("/space/accounts", s.spaceHandler.ListAccounts).Methods("GET")
-	api.HandleFunc("/space/accounts/{id}", s.spaceHandler.AccountDetail).Methods("GET")
-	api.HandleFunc("/space/accounts/{id}/sync", s.spaceHandler.SyncAccount).Methods("POST")
+	api.HandleFunc("/space", s.spaceHandler.Overview).Methods("GET", "OPTIONS")
+	api.HandleFunc("/space/accounts", s.spaceHandler.ListAccounts).Methods("GET", "OPTIONS")
+	api.HandleFunc("/space/accounts/{id}", s.spaceHandler.AccountDetail).Methods("GET", "OPTIONS")
+	api.HandleFunc("/space/accounts/{id}/sync", s.spaceHandler.SyncAccount).Methods("POST", "OPTIONS")
+
+	// OAuth routes for OneDrive authorization
+	api.HandleFunc("/oauth/setup", s.oauthHandler.SetupGuide).Methods("GET", "OPTIONS")
+	api.HandleFunc("/oauth/create", s.oauthHandler.CreateAccount).Methods("GET", "POST", "OPTIONS")
+	api.HandleFunc("/oauth/accounts", s.oauthHandler.AccountList).Methods("GET", "OPTIONS")
+	api.HandleFunc("/oauth/authorize/{id}", s.oauthHandler.Authorize).Methods("GET", "OPTIONS")
+	api.HandleFunc("/oauth/callback", s.oauthHandler.Callback).Methods("GET", "OPTIONS")
+	api.HandleFunc("/oauth/status/{id}", s.oauthHandler.TokenStatus).Methods("GET", "OPTIONS")
 
 	// Virtual File System routes
-	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.UploadFile).Methods("PUT")
-	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Get).Methods("GET")
-	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Head).Methods("HEAD")
-	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Delete).Methods("DELETE")
-	api.HandleFunc("/vfs/{bucket}/_mkdir", s.vfsHandler.CreateDirectory).Methods("POST")
-	api.HandleFunc("/vfs/{bucket}/_move", s.vfsHandler.Move).Methods("POST")
-	api.HandleFunc("/vfs/{bucket}/_copy", s.vfsHandler.Copy).Methods("POST")
+	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.UploadFile).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Get).Methods("GET", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Head).Methods("HEAD", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Delete).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_mkdir", s.vfsHandler.CreateDirectory).Methods("POST", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_move", s.vfsHandler.Move).Methods("POST", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_copy", s.vfsHandler.Copy).Methods("POST", "OPTIONS")
 
-	// Web application routes (static files)
-	s.router.PathPrefix("/static/").HandlerFunc(s.webHandler.ServeStatic)
-	s.router.HandleFunc("/", s.webHandler.ServeIndex).Methods("GET")
+	// Root endpoint - API info
+	s.router.HandleFunc("/", s.healthHandler.Info).Methods("GET", "OPTIONS")
 }

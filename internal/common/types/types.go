@@ -17,6 +17,7 @@ type ServerConfig struct {
 	Host      string `yaml:"host"`
 	Port      int    `yaml:"port"`
 	APIPrefix string `yaml:"api_prefix"`
+	BaseURL   string `yaml:"base_url"`
 }
 
 // DatabaseConfig represents database configuration

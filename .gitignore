@@ -40,3 +40,12 @@ configs/config.local.yaml
 # Temporary files
 /tmp/
 *.tmp
+
+# Local data storage
+data/
+
+# History (VS Code Local History)
+.history/
+
+# Temporary scripts
+check_build.sh

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/xuecangming/onedrive-storage/internal/common/errors"
 	"github.com/xuecangming/onedrive-storage/internal/common/types"
 	"github.com/xuecangming/onedrive-storage/internal/infrastructure/onedrive"
@@ -32,9 +33,14 @@ func (s *Service) Create(ctx context.Context, account *types.StorageAccount) err
 		return errors.NewAppError("ACCOUNT_EXISTS", "Account with this email already exists", 409)
 	}
 
+	// Generate UUID if not provided
+	if account.ID == "" {
+		account.ID = uuid.New().String()
+	}
+
 	// Set default values
 	if account.Status == "" {
-		account.Status = "active"
+		account.Status = "pending"
 	}
 	if account.Priority == 0 {
 		account.Priority = 10
