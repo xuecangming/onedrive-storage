@@ -109,7 +109,7 @@ func (s *Service) UploadFile(bucket, path string, content io.Reader, size int64,
 }
 
 // InitiateUpload starts a multipart upload
-func (s *Service) InitiateUpload(bucket, path, mimeType string) (string, error) {
+func (s *Service) InitiateUpload(bucket, path, mimeType string, size int64) (string, error) {
 	// Validate bucket
 	_, err := s.bucketRepo.Get(context.Background(), bucket)
 	if err != nil {
@@ -143,6 +143,21 @@ func (s *Service) InitiateUpload(bucket, path, mimeType string) (string, error) 
 	if err != nil {
 		return "", err
 	}
+
+	// Create upload task
+	_, err = s.taskSvc.CreateTask(types.TaskTypeUpload, map[string]interface{}{
+		"upload_id":      objectKey,
+		"bucket":         bucket,
+		"path":           path,
+		"total_size":     size,
+		"mime_type":      mimeType,
+		"bytes_uploaded": 0,
+	})
+	if err != nil {
+		// Log error but continue? Or fail?
+		// For now, let's continue but log it (if we had a logger here)
+		// Or just ignore task creation failure to avoid blocking upload
+	}
 	
 	return objectKey, nil
 }
@@ -151,7 +166,51 @@ func (s *Service) InitiateUpload(bucket, path, mimeType string) (string, error) 
 func (s *Service) UploadPart(bucket, uploadID string, partNumber int, data []byte) error {
 	ctx := context.Background()
 	_, err := s.objectSvc.UploadPart(ctx, bucket, uploadID, partNumber, data)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Update task progress
+	task, err := s.taskSvc.GetTaskByMetadata("upload_id", uploadID)
+	if err == nil && task != nil {
+		// Update bytes uploaded
+		currentBytes := int64(0)
+		if val, ok := task.Metadata["bytes_uploaded"].(float64); ok {
+			currentBytes = int64(val)
+		} else if val, ok := task.Metadata["bytes_uploaded"].(int64); ok {
+			currentBytes = val
+		} else if val, ok := task.Metadata["bytes_uploaded"].(int); ok {
+			currentBytes = int64(val)
+		}
+
+		newBytes := currentBytes + int64(len(data))
+		task.Metadata["bytes_uploaded"] = newBytes
+
+		totalSize := int64(0)
+		if val, ok := task.Metadata["total_size"].(float64); ok {
+			totalSize = int64(val)
+		} else if val, ok := task.Metadata["total_size"].(int64); ok {
+			totalSize = val
+		} else if val, ok := task.Metadata["total_size"].(int); ok {
+			totalSize = int64(val)
+		}
+
+		if totalSize > 0 {
+			percent := int((newBytes * 100) / totalSize)
+			if percent > 99 {
+				percent = 99 // Don't complete until Complete call
+			}
+			task.Progress = percent
+		}
+
+		if task.Status == types.TaskStatusPending {
+			task.Status = types.TaskStatusRunning
+		}
+
+		_ = s.taskSvc.UpdateTask(task)
+	}
+
+	return nil
 }
 
 // CompleteUpload completes a multipart upload
@@ -200,6 +259,15 @@ func (s *Service) CompleteUpload(bucket, path, uploadID string, totalSize int64,
 		return nil, err
 	}
 
+	// Complete task
+	task, err := s.taskSvc.GetTaskByMetadata("upload_id", uploadID)
+	if err == nil && task != nil {
+		_ = s.taskSvc.CompleteTask(task.ID, map[string]interface{}{
+			"file_id": file.ID,
+			"path":    file.FullPath,
+		})
+	}
+
 	return file, nil
 }
 
@@ -212,7 +280,15 @@ func (s *Service) ListParts(bucket, uploadID string) ([]*types.ObjectChunk, erro
 // AbortUpload aborts a multipart upload
 func (s *Service) AbortUpload(bucket, uploadID string) error {
 	ctx := context.Background()
-	return s.objectSvc.AbortMultipartUpload(ctx, bucket, uploadID)
+	err := s.objectSvc.AbortMultipartUpload(ctx, bucket, uploadID)
+	
+	// Fail/Cancel task
+	task, taskErr := s.taskSvc.GetTaskByMetadata("upload_id", uploadID)
+	if taskErr == nil && task != nil {
+		_ = s.taskSvc.FailTask(task.ID, "Upload aborted")
+	}
+	
+	return err
 }
 
 // GetFile retrieves a file by path
@@ -235,11 +311,33 @@ func (s *Service) DownloadFile(bucket, path string) (object.ReadSeekCloser, *typ
 		return nil, nil, err
 	}
 
+	// Create download task
+	task, err := s.taskSvc.CreateTask(types.TaskTypeDownload, map[string]interface{}{
+		"file_id":    file.ID,
+		"bucket":     bucket,
+		"path":       path,
+		"total_size": file.Size,
+		"bytes_read": 0,
+	})
+
 	// Download from object storage
 	ctx := context.Background()
 	_, reader, err := s.objectSvc.Download(ctx, bucket, file.ObjectKey)
 	if err != nil {
+		if task != nil {
+			_ = s.taskSvc.FailTask(task.ID, err.Error())
+		}
 		return nil, nil, err
+	}
+
+	if task != nil {
+		// Wrap reader to track progress
+		reader = &progressReader{
+			ReadSeekCloser: reader,
+			taskSvc:        s.taskSvc,
+			taskID:         task.ID,
+			totalSize:      file.Size,
+		}
 	}
 
 	return reader, file, nil
@@ -884,4 +982,49 @@ func (s *Service) copyRecursive(bucket, source, destination string) error {
 	}
 
 	return nil
+}
+
+// progressReader wraps a ReadSeekCloser to track download progress
+type progressReader struct {
+object.ReadSeekCloser
+taskSvc   *task.Service
+taskID    string
+totalSize int64
+readSize  int64
+}
+
+func (r *progressReader) Read(p []byte) (n int, err error) {
+n, err = r.ReadSeekCloser.Read(p)
+if n > 0 {
+r.readSize += int64(n)
+
+// Update task progress
+// To avoid excessive updates, we could check if percentage changed or time elapsed
+// For simplicity, we update every time (might be heavy)
+task, err := r.taskSvc.GetTask(r.taskID)
+if err == nil && task != nil {
+task.Metadata["bytes_read"] = r.readSize
+if r.totalSize > 0 {
+percent := int((r.readSize * 100) / r.totalSize)
+if percent > 100 { percent = 100 }
+task.Progress = percent
+}
+if task.Status == types.TaskStatusPending {
+task.Status = types.TaskStatusRunning
+}
+_ = r.taskSvc.UpdateTask(task)
+}
+}
+return
+}
+
+func (r *progressReader) Close() error {
+// Mark task completed
+task, err := r.taskSvc.GetTask(r.taskID)
+if err == nil && task != nil {
+_ = r.taskSvc.CompleteTask(task.ID, map[string]interface{}{
+"bytes_read": r.readSize,
+})
+}
+return r.ReadSeekCloser.Close()
 }

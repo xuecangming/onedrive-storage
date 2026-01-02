@@ -17,10 +17,12 @@ const (
 type TaskType string
 
 const (
-	TaskTypeCopy   TaskType = "copy"
-	TaskTypeMove   TaskType = "move"
-	TaskTypeDelete TaskType = "delete"
-	TaskTypeSync   TaskType = "sync"
+	TaskTypeCopy     TaskType = "copy"
+	TaskTypeMove     TaskType = "move"
+	TaskTypeDelete   TaskType = "delete"
+	TaskTypeSync     TaskType = "sync"
+	TaskTypeUpload   TaskType = "upload"
+	TaskTypeDownload TaskType = "download"
 )
 
 // Task represents an asynchronous background task

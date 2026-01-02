@@ -95,3 +95,13 @@ func (s *Service) FailTask(id string, errorMsg string) error {
 func (s *Service) ListTasks() ([]*types.Task, error) {
 	return s.repo.List()
 }
+
+// GetTaskByMetadata finds a task by metadata
+func (s *Service) GetTaskByMetadata(key string, value interface{}) (*types.Task, error) {
+	return s.repo.FindByMetadata(key, value)
+}
+
+// UpdateTask updates a task directly
+func (s *Service) UpdateTask(task *types.Task) error {
+	return s.repo.Update(task)
+}

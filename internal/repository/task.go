@@ -81,3 +81,18 @@ func (r *TaskRepository) Delete(id string) error {
 	delete(r.tasks, id)
 	return nil
 }
+
+// FindByMetadata finds a task by metadata key-value pair
+func (r *TaskRepository) FindByMetadata(key string, value interface{}) (*types.Task, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, task := range r.tasks {
+		if task.Metadata != nil {
+			if v, ok := task.Metadata[key]; ok && v == value {
+				return task, nil
+			}
+		}
+	}
+	return nil, errors.NewNotFoundError("task not found")
+}
