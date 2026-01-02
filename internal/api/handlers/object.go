@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -65,15 +66,22 @@ func (h *ObjectHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		contentType = "application/octet-stream"
 	}
 
-	// Read the entire request body
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		handleError(w, r, err)
-		return
+	var reader io.Reader = r.Body
+	size := r.ContentLength
+
+	// If Content-Length is missing, we must read the body to know the size
+	if size <= 0 {
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			handleError(w, r, err)
+			return
+		}
+		size = int64(len(data))
+		reader = bytes.NewReader(data)
 	}
 	defer r.Body.Close()
 
-	obj, err := h.service.Upload(r.Context(), bucketName, key, data, contentType)
+	obj, err := h.service.Upload(r.Context(), bucketName, key, reader, size, contentType)
 	if err != nil {
 		handleError(w, r, err)
 		return
@@ -91,50 +99,16 @@ func (h *ObjectHandler) Download(w http.ResponseWriter, r *http.Request) {
 	bucketName := vars["bucket"]
 	key := vars["key"]
 
-	obj, data, err := h.service.Download(r.Context(), bucketName, key)
+	obj, reader, err := h.service.Download(r.Context(), bucketName, key)
 	if err != nil {
 		handleError(w, r, err)
 		return
 	}
+	defer reader.Close()
 
-	totalSize := int64(len(data))
-	
-	// Set common headers
-	w.Header().Set("Content-Type", obj.MimeType)
-	if obj.ETag != "" {
-		w.Header().Set("ETag", obj.ETag)
-	}
-	w.Header().Set("Accept-Ranges", "bytes")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
-
-	// Check for Range header
-	rangeHeader := r.Header.Get("Range")
-	if rangeHeader == "" {
-		// No range requested, return full content
-		w.Header().Set("Content-Length", strconv.FormatInt(totalSize, 10))
-		w.WriteHeader(http.StatusOK)
-		w.Write(data)
-		return
-	}
-
-	// Parse Range header
-	start, end, err := parseRangeHeader(rangeHeader, totalSize)
-	if err != nil {
-		w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", totalSize))
-		http.Error(w, "Requested Range Not Satisfiable", http.StatusRequestedRangeNotSatisfiable)
-		return
-	}
-
-	// Calculate content length for partial content
-	contentLength := end - start + 1
-
-	// Set headers for partial content
-	w.Header().Set("Content-Length", strconv.FormatInt(contentLength, 10))
-	w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, totalSize))
-	w.WriteHeader(http.StatusPartialContent)
-
-	// Write the requested range
-	w.Write(data[start : end+1])
+	// Use http.ServeContent to handle Range requests automatically
+	// It requires an io.ReadSeeker, which our reader now implements
+	http.ServeContent(w, r, obj.Key, obj.UpdatedAt, reader)
 }
 
 // parseRangeHeader parses the Range header and returns start and end byte positions

@@ -247,3 +247,27 @@ type SearchResult struct {
 	CreatedAt time.Time `json:"created_at"`
 	MatchType string    `json:"match_type"` // "name", "extension", etc.
 }
+
+// AuditReport represents a consistency check report
+type AuditReport struct {
+	ID            string        `json:"id"`
+	Status        string        `json:"status"` // "running", "completed", "failed"
+	StartTime     time.Time     `json:"start_time"`
+	EndTime       *time.Time    `json:"end_time,omitempty"`
+	TotalObjects  int64         `json:"total_objects"`
+	TotalChunks   int64         `json:"total_chunks"`
+	CheckedCount  int64         `json:"checked_count"`
+	Issues        []AuditIssue  `json:"issues"`
+	Summary       string        `json:"summary,omitempty"`
+}
+
+// AuditIssue represents an issue found during audit
+type AuditIssue struct {
+	Type        string `json:"type"` // "missing_file", "invalid_token", "size_mismatch"
+	Bucket      string `json:"bucket"`
+	Key         string `json:"key"`
+	ChunkIndex  *int   `json:"chunk_index,omitempty"`
+	AccountID   string `json:"account_id,omitempty"`
+	RemoteID    string `json:"remote_id,omitempty"`
+	Description string `json:"description"`
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/xuecangming/onedrive-storage/internal/common/utils"
 	"github.com/xuecangming/onedrive-storage/internal/repository"
 	"github.com/xuecangming/onedrive-storage/internal/service/object"
+	"github.com/xuecangming/onedrive-storage/internal/service/task"
 )
 
 // Service handles virtual file system operations
@@ -21,14 +22,16 @@ type Service struct {
 	vfsRepo    *repository.VFSRepository
 	objectSvc  *object.Service
 	bucketRepo *repository.BucketRepository
+	taskSvc    *task.Service
 }
 
 // NewService creates a new VFS service
-func NewService(vfsRepo *repository.VFSRepository, objectSvc *object.Service, bucketRepo *repository.BucketRepository) *Service {
+func NewService(vfsRepo *repository.VFSRepository, objectSvc *object.Service, bucketRepo *repository.BucketRepository, taskSvc *task.Service) *Service {
 	return &Service{
 		vfsRepo:    vfsRepo,
 		objectSvc:  objectSvc,
 		bucketRepo: bucketRepo,
+		taskSvc:    taskSvc,
 	}
 }
 
@@ -74,15 +77,9 @@ func (s *Service) UploadFile(bucket, path string, content io.Reader, size int64,
 	// Generate unique object key
 	objectKey := utils.GenerateID()
 
-	// Read content into byte array
-	data, err := io.ReadAll(content)
-	if err != nil {
-		return nil, err
-	}
-
 	// Upload to object storage
 	ctx := context.Background()
-	_, err = s.objectSvc.Upload(ctx, bucket, objectKey, data, mimeType)
+	_, err = s.objectSvc.Upload(ctx, bucket, objectKey, content, size, mimeType)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +93,7 @@ func (s *Service) UploadFile(bucket, path string, content io.Reader, size int64,
 		Name:        filename,
 		FullPath:    path,
 		ObjectKey:   objectKey,
-		Size:        int64(len(data)), // Use actual data size, not Content-Length
+		Size:        size,
 		MimeType:    mimeType,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -109,6 +106,113 @@ func (s *Service) UploadFile(bucket, path string, content io.Reader, size int64,
 	}
 
 	return file, nil
+}
+
+// InitiateUpload starts a multipart upload
+func (s *Service) InitiateUpload(bucket, path, mimeType string) (string, error) {
+	// Validate bucket
+	_, err := s.bucketRepo.Get(context.Background(), bucket)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", errors.NewBucketNotFoundError(bucket)
+		}
+		return "", err
+	}
+
+	// Normalize path
+	path = normalizePath(path)
+	if path == "/" || path == "" {
+		return "", errors.NewInvalidRequestError("path cannot be root directory")
+	}
+
+	// Check if file already exists
+	exists, err := s.vfsRepo.FileExists(bucket, path)
+	if err != nil {
+		return "", err
+	}
+	if exists {
+		return "", errors.NewConflictError(fmt.Sprintf("file already exists at path: %s", path))
+	}
+
+	// Generate unique object key which will serve as upload ID
+	objectKey := utils.GenerateID()
+	
+	// Call object service to initiate upload (creates placeholder object)
+	ctx := context.Background()
+	_, err = s.objectSvc.InitiateMultipartUpload(ctx, bucket, objectKey, mimeType)
+	if err != nil {
+		return "", err
+	}
+	
+	return objectKey, nil
+}
+
+// UploadPart uploads a part for a multipart upload
+func (s *Service) UploadPart(bucket, uploadID string, partNumber int, data []byte) error {
+	ctx := context.Background()
+	_, err := s.objectSvc.UploadPart(ctx, bucket, uploadID, partNumber, data)
+	return err
+}
+
+// CompleteUpload completes a multipart upload
+func (s *Service) CompleteUpload(bucket, path, uploadID string, totalSize int64, mimeType string) (*types.VirtualFile, error) {
+	// Normalize path
+	path = normalizePath(path)
+	
+	// Parse directory and filename
+	dirPath, filename := splitPath(path)
+
+	// Ensure directory path exists
+	var directoryID *string
+	if dirPath != "/" {
+		dir, err := s.ensureDirectoryPath(bucket, dirPath)
+		if err != nil {
+			return nil, err
+		}
+		directoryID = &dir.ID
+	}
+
+	// Complete object upload
+	ctx := context.Background()
+	_, err := s.objectSvc.CompleteMultipartUpload(ctx, bucket, uploadID, totalSize, mimeType)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create virtual file record
+	now := time.Now()
+	file := &types.VirtualFile{
+		ID:          utils.GenerateID(),
+		Bucket:      bucket,
+		DirectoryID: directoryID,
+		Name:        filename,
+		FullPath:    path,
+		ObjectKey:   uploadID,
+		Size:        totalSize,
+		MimeType:    mimeType,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if err := s.vfsRepo.CreateFile(file); err != nil {
+		// Clean up object if file creation fails
+		_ = s.objectSvc.Delete(ctx, bucket, uploadID)
+		return nil, err
+	}
+
+	return file, nil
+}
+
+// ListParts lists uploaded parts for a multipart upload
+func (s *Service) ListParts(bucket, uploadID string) ([]*types.ObjectChunk, error) {
+	ctx := context.Background()
+	return s.objectSvc.ListParts(ctx, bucket, uploadID)
+}
+
+// AbortUpload aborts a multipart upload
+func (s *Service) AbortUpload(bucket, uploadID string) error {
+	ctx := context.Background()
+	return s.objectSvc.AbortMultipartUpload(ctx, bucket, uploadID)
 }
 
 // GetFile retrieves a file by path
@@ -125,7 +229,7 @@ func (s *Service) GetFile(bucket, path string) (*types.VirtualFile, error) {
 }
 
 // DownloadFile downloads a file by path
-func (s *Service) DownloadFile(bucket, path string) ([]byte, *types.VirtualFile, error) {
+func (s *Service) DownloadFile(bucket, path string) (object.ReadSeekCloser, *types.VirtualFile, error) {
 	file, err := s.GetFile(bucket, path)
 	if err != nil {
 		return nil, nil, err
@@ -133,12 +237,23 @@ func (s *Service) DownloadFile(bucket, path string) ([]byte, *types.VirtualFile,
 
 	// Download from object storage
 	ctx := context.Background()
-	_, data, err := s.objectSvc.Download(ctx, bucket, file.ObjectKey)
+	_, reader, err := s.objectSvc.Download(ctx, bucket, file.ObjectKey)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return data, file, nil
+	return reader, file, nil
+}
+
+// GetThumbnail retrieves a thumbnail for a file
+func (s *Service) GetThumbnail(bucket, path string, size string) ([]byte, string, error) {
+	file, err := s.GetFile(bucket, path)
+	if err != nil {
+		return nil, "", err
+	}
+
+	ctx := context.Background()
+	return s.objectSvc.GetThumbnail(ctx, bucket, file.ObjectKey, size)
 }
 
 // ListDirectory lists contents of a directory
@@ -585,4 +700,188 @@ func splitPath(path string) (string, string) {
 	}
 
 	return dir, file
+}
+
+// DeleteDirectoryAsync deletes a directory asynchronously
+func (s *Service) DeleteDirectoryAsync(bucket, path string, recursive bool) (*types.Task, error) {
+	// Create task
+	metadata := map[string]interface{}{
+		"bucket":    bucket,
+		"path":      path,
+		"recursive": recursive,
+		"operation": "delete_directory",
+	}
+	
+	task, err := s.taskSvc.CreateTask(types.TaskTypeDelete, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	// Start background process
+	go func() {
+		err := s.DeleteDirectory(bucket, path, recursive)
+		if err != nil {
+			s.taskSvc.FailTask(task.ID, err.Error())
+		} else {
+			s.taskSvc.CompleteTask(task.ID, nil)
+		}
+	}()
+
+	return task, nil
+}
+
+// MoveDirectoryAsync moves a directory asynchronously
+func (s *Service) MoveDirectoryAsync(bucket, source, destination string) (*types.Task, error) {
+	// Create task
+	metadata := map[string]interface{}{
+		"bucket":      bucket,
+		"source":      source,
+		"destination": destination,
+		"operation":   "move_directory",
+	}
+	
+	task, err := s.taskSvc.CreateTask(types.TaskTypeMove, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	// Start background process
+	go func() {
+		_, err := s.MoveDirectory(bucket, source, destination)
+		if err != nil {
+			s.taskSvc.FailTask(task.ID, err.Error())
+		} else {
+			s.taskSvc.CompleteTask(task.ID, nil)
+		}
+	}()
+
+	return task, nil
+}
+
+// CopyDirectoryAsync copies a directory asynchronously
+func (s *Service) CopyDirectoryAsync(bucket, source, destination string) (*types.Task, error) {
+	// Create task
+	metadata := map[string]interface{}{
+		"bucket":      bucket,
+		"source":      source,
+		"destination": destination,
+		"operation":   "copy_directory",
+	}
+	
+	task, err := s.taskSvc.CreateTask(types.TaskTypeCopy, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	// Start background process
+	go func() {
+		err := s.CopyDirectory(bucket, source, destination)
+		if err != nil {
+			s.taskSvc.FailTask(task.ID, err.Error())
+		} else {
+			s.taskSvc.CompleteTask(task.ID, nil)
+		}
+	}()
+
+	return task, nil
+}
+
+// CopyDirectory copies a directory (synchronous implementation)
+func (s *Service) CopyDirectory(bucket, source, destination string) error {
+	source = normalizePath(source)
+	destination = normalizePath(destination)
+
+	if source == "/" || destination == "/" {
+		return errors.NewInvalidRequestError("cannot copy root directory")
+	}
+
+	if source == destination {
+		return errors.NewInvalidRequestError("source and destination are the same")
+	}
+
+	// Check if destination is a subdirectory of source
+	if strings.HasPrefix(destination, source+"/") {
+		return errors.NewInvalidRequestError("cannot copy directory into itself")
+	}
+
+	// Get source directory
+	_, err := s.vfsRepo.GetDirectory(bucket, source)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return errors.NewNotFoundError(fmt.Sprintf("source directory not found: %s", source))
+		}
+		return err
+	}
+
+	// Check if destination already exists
+	exists, err := s.vfsRepo.DirectoryExists(bucket, destination)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return errors.NewConflictError(fmt.Sprintf("destination directory already exists: %s", destination))
+	}
+
+	// Create destination directory
+	_, err = s.ensureDirectoryPath(bucket, destination)
+	if err != nil {
+		return err
+	}
+
+	// Copy all subdirectories and files
+	return s.copyRecursive(bucket, source, destination)
+}
+
+// copyRecursive recursively copies files and directories
+func (s *Service) copyRecursive(bucket, source, destination string) error {
+	// Ensure paths don't have trailing slashes for consistent replacement
+	source = strings.TrimSuffix(source, "/")
+	destination = strings.TrimSuffix(destination, "/")
+
+	// List all files in source directory
+	files, err := s.vfsRepo.ListFilesByDirectory(bucket, source)
+	if err != nil {
+		return err
+	}
+
+	// Copy files
+	for _, file := range files {
+		// Calculate new path
+		newPath := strings.Replace(file.FullPath, source, destination, 1)
+		
+		// Download file content
+		reader, _, err := s.DownloadFile(bucket, file.FullPath)
+		if err != nil {
+			return err
+		}
+		
+		// Upload to new location
+		// Note: This is inefficient for large files/directories as it streams data through the server
+		// A better approach would be to use cloud provider's server-side copy if available
+		_, err = s.UploadFile(bucket, newPath, reader, file.Size, file.MimeType)
+		reader.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	// List all subdirectories
+	dirs, err := s.vfsRepo.ListDirectoriesByPath(bucket, source+"/")
+	if err != nil {
+		return err
+	}
+
+	// Create subdirectories
+	for _, dir := range dirs {
+		// Calculate new path
+		newPath := strings.Replace(dir.FullPath, source, destination, 1)
+		
+		// Create directory
+		_, err := s.ensureDirectoryPath(bucket, newPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

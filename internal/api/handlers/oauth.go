@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/xuecangming/onedrive-storage/internal/api/templates"
-	"github.com/xuecangming/onedrive-storage/internal/common/types"
 	"github.com/xuecangming/onedrive-storage/internal/infrastructure/onedrive"
 	"github.com/xuecangming/onedrive-storage/internal/service/account"
 )
@@ -17,7 +15,6 @@ import (
 type OAuthHandler struct {
 	accountService *account.Service
 	baseURL        string
-	tmpl           *templates.Manager
 }
 
 // NewOAuthHandler creates a new OAuth handler
@@ -25,7 +22,6 @@ func NewOAuthHandler(accountService *account.Service, baseURL string) *OAuthHand
 	return &OAuthHandler{
 		accountService: accountService,
 		baseURL:        baseURL,
-		tmpl:           templates.GetManager(),
 	}
 }
 
@@ -146,16 +142,8 @@ func (h *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	// Try to sync space info
 	_ = h.accountService.SyncSpaceInfo(r.Context(), acc.ID)
 
-	// Return success page using template
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	data := templates.SuccessData{
-		Name:  acc.Name,
-		Email: acc.Email,
-	}
-	if err := h.tmpl.Render(w, "success.html", data); err != nil {
-		http.Error(w, "Failed to render template", http.StatusInternalServerError)
-		return
-	}
+	// Redirect to root (frontend)
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 // TokenStatus handles GET /oauth/status/{id}
@@ -184,104 +172,4 @@ func (h *OAuthHandler) TokenStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(status)
-}
-
-// SetupGuide handles GET /oauth/setup
-// Returns HTML guide for setting up OneDrive accounts
-func (h *OAuthHandler) SetupGuide(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// Get dynamic redirect URI from request
-	redirectURI := h.getRedirectURI(r)
-	data := templates.SetupGuideData{
-		RedirectURI: redirectURI,
-	}
-	if err := h.tmpl.Render(w, "setup_guide.html", data); err != nil {
-		http.Error(w, "Failed to render template", http.StatusInternalServerError)
-		return
-	}
-}
-
-// CreateAccount handles quick account creation with form data
-func (h *OAuthHandler) CreateAccount(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		// Show form using template
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := h.tmpl.Render(w, "account_form.html", nil); err != nil {
-			http.Error(w, "Failed to render template", http.StatusInternalServerError)
-		}
-		return
-	}
-
-	// Handle POST - create account and redirect to authorize
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Invalid form data", http.StatusBadRequest)
-		return
-	}
-
-	acc := &types.StorageAccount{
-		Name:         r.FormValue("name"),
-		Email:        r.FormValue("email"),
-		ClientID:     r.FormValue("client_id"),
-		ClientSecret: r.FormValue("client_secret"),
-		TenantID:     r.FormValue("tenant_id"),
-		Status:       "pending",
-		Priority:     10,
-	}
-
-	if err := h.accountService.Create(r.Context(), acc); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create account: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	// Redirect to authorization (use StatusSeeOther to convert POST to GET)
-	http.Redirect(w, r, fmt.Sprintf("/api/v1/oauth/authorize/%s", acc.ID), http.StatusSeeOther)
-}
-
-// AccountList shows all accounts with management UI
-func (h *OAuthHandler) AccountList(w http.ResponseWriter, r *http.Request) {
-	accounts, err := h.accountService.List(r.Context())
-	if err != nil {
-		http.Error(w, "Failed to list accounts", http.StatusInternalServerError)
-		return
-	}
-
-	// Convert accounts to view data
-	var viewData []templates.AccountViewData
-	for _, acc := range accounts {
-		statusClass := "status-pending"
-		statusText := "待授权"
-		if acc.Status == "active" {
-			statusClass = "status-active"
-			statusText = "已激活"
-		} else if acc.Status == "error" {
-			statusClass = "status-error"
-			statusText = "错误"
-		}
-
-		usedPercent := 0.0
-		spaceInfo := "未同步"
-		if acc.TotalSpace > 0 {
-			usedPercent = float64(acc.UsedSpace) / float64(acc.TotalSpace) * 100
-			usedGB := float64(acc.UsedSpace) / (1024 * 1024 * 1024)
-			totalGB := float64(acc.TotalSpace) / (1024 * 1024 * 1024)
-			spaceInfo = fmt.Sprintf("%.1f GB / %.1f GB (%.1f%%)", usedGB, totalGB, usedPercent)
-		}
-
-		viewData = append(viewData, templates.AccountViewData{
-			ID:          acc.ID,
-			Name:        acc.Name,
-			Email:       acc.Email,
-			SpaceInfo:   spaceInfo,
-			UsedPercent: usedPercent,
-			StatusClass: statusClass,
-			StatusText:  statusText,
-		})
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	data := templates.AccountListData{Accounts: viewData}
-	if err := h.tmpl.Render(w, "account_list.html", data); err != nil {
-		http.Error(w, "Failed to render template", http.StatusInternalServerError)
-		return
-	}
 }

@@ -34,7 +34,6 @@ func GetManager() *Manager {
 // loadTemplates loads all templates from embedded filesystem
 func (m *Manager) loadTemplates() {
 	templateNames := []string{
-		"success.html",
 		"setup_guide.html",
 		"account_form.html",
 		"account_list.html",
@@ -72,12 +71,6 @@ func (e *TemplateNotFoundError) Error() string {
 }
 
 // Template data structures
-
-// SuccessData holds data for the success page template
-type SuccessData struct {
-	Name  string
-	Email string
-}
 
 // SetupGuideData holds data for the setup guide template
 type SetupGuideData struct {

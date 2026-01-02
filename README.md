@@ -297,7 +297,17 @@ go test ./...
 
 ## Web 云盘应用
 
-本项目包含一个独立的 Web 云盘应用 (`web-app/`)，通过调用中间件 API 实现文件管理功能。
+本项目包含一个基于 **React + TypeScript + Ant Design** 构建的现代化 Web 云盘应用（`cloud-drive/`），通过调用中间件 API 实现文件管理功能。
+
+### 技术栈
+
+- **React 19** - 前端框架
+- **TypeScript** - 类型安全
+- **Vite 7** - 构建工具
+- **Ant Design 6** - UI 组件库
+- **React Router 7** - 客户端路由
+- **React Query** - 服务端状态管理
+- **Zustand** - 客户端状态管理
 
 ### 功能特性
 
@@ -309,6 +319,9 @@ go test ./...
 - 🗑️ **回收站** - 删除的文件暂存30天，支持恢复或永久删除
 - 👁️ **文件预览** - 支持图片、视频、音频、文本等格式预览
 - 📊 **存储统计** - 实时显示存储空间使用情况
+- ⚙️ **设置页面** - 配置 API 地址、主题等
+- 👤 **账户管理** - 管理 OneDrive 账户连接
+- 📦 **存储桶管理** - 创建和管理存储桶
 - 🎨 **现代界面** - 响应式设计，支持网格/列表视图切换
 - ⌨️ **快捷操作** - 支持拖拽上传、右键菜单、批量选择
 
@@ -319,33 +332,39 @@ go test ./...
 ./start.sh
 ```
 
-2. 启动 Web 应用（默认端口 3000）：
+2. 启动 Web 应用（默认端口 5173）：
 ```bash
 ./start-web.sh
 ```
 
-3. 访问 Web 界面：`http://localhost:3000`
+3. 访问 Web 界面：`http://localhost:5173`
 
-### 配置 API 地址
+### 开发模式
 
-修改 `web-app/index.html` 中的 `API_BASE_URL` 来指定中间件 API 地址：
+进入 `cloud-drive` 目录手动启动开发服务器：
 
-```html
-<script>
-    window.API_BASE_URL = 'http://localhost:8080/api/v1';
-</script>
-```
-
-或者通过环境变量启动：
 ```bash
-API_URL=http://your-middleware-host:8080/api/v1 ./start-web.sh
+cd cloud-drive
+npm install
+npm run dev
 ```
+
+### 生产构建
+
+```bash
+cd cloud-drive
+npm run build
+```
+
+构建后的文件位于 `cloud-drive/dist` 目录。
 
 ### 快捷键
 
 - `Ctrl/Cmd + A` - 全选
 - `Delete` - 删除选中项
 - `Escape` - 取消选择或关闭弹窗
+- `Shift + Click` - 范围选择
+- `Ctrl/Cmd + Click` - 多选
 
 ### 文件预览
 

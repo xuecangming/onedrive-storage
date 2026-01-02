@@ -55,6 +55,49 @@ func (r *ObjectRepository) Create(ctx context.Context, obj *types.Object) error 
 	return nil
 }
 
+// Update updates an existing object
+func (r *ObjectRepository) Update(ctx context.Context, obj *types.Object) error {
+	query := `
+		UPDATE objects
+		SET account_id = $1, remote_id = $2, remote_path = $3,
+			size = $4, etag = $5, mime_type = $6, is_chunked = $7, chunk_count = $8,
+			metadata = $9, updated_at = $10
+		WHERE bucket = $11 AND key = $12
+	`
+
+	var metadataJSON []byte
+	var err error
+	if obj.Metadata != nil {
+		metadataJSON, err = json.Marshal(obj.Metadata)
+		if err != nil {
+			return err
+		}
+	}
+	now := time.Now()
+
+	result, err := r.db.ExecContext(ctx, query,
+		obj.AccountID, obj.RemoteID, obj.RemotePath,
+		obj.Size, obj.ETag, obj.MimeType, obj.IsChunked, obj.ChunkCount,
+		metadataJSON, now,
+		obj.Bucket, obj.Key,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
+	obj.UpdatedAt = now
+	return nil
+}
+
 // Get retrieves an object by bucket and key
 func (r *ObjectRepository) Get(ctx context.Context, bucket, key string) (*types.Object, error) {
 	query := `
@@ -174,4 +217,145 @@ func (r *ObjectRepository) UpdateBucketStats(ctx context.Context, bucket string)
 
 	_, err := r.db.ExecContext(ctx, query, bucket, time.Now())
 	return err
+}
+
+// CreateChunk creates a new object chunk
+func (r *ObjectRepository) CreateChunk(ctx context.Context, chunk *types.ObjectChunk) error {
+	query := `
+		INSERT INTO object_chunks (
+			id, bucket, key, chunk_index, account_id, remote_id, remote_path,
+			chunk_size, checksum, status, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`
+
+	now := time.Now()
+	_, err := r.db.ExecContext(ctx, query,
+		chunk.ID, chunk.Bucket, chunk.Key, chunk.ChunkIndex, chunk.AccountID,
+		chunk.RemoteID, chunk.RemotePath, chunk.ChunkSize, chunk.Checksum,
+		chunk.Status, now,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	chunk.CreatedAt = now
+	return nil
+}
+
+// GetChunks retrieves all chunks for an object, ordered by index
+func (r *ObjectRepository) GetChunks(ctx context.Context, bucket, key string) ([]*types.ObjectChunk, error) {
+	query := `
+		SELECT id, bucket, key, chunk_index, account_id, remote_id, remote_path,
+		       chunk_size, checksum, status, created_at
+		FROM object_chunks
+		WHERE bucket = $1 AND key = $2
+		ORDER BY chunk_index ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, bucket, key)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var chunks []*types.ObjectChunk
+	for rows.Next() {
+		chunk := &types.ObjectChunk{}
+		err := rows.Scan(
+			&chunk.ID, &chunk.Bucket, &chunk.Key, &chunk.ChunkIndex, &chunk.AccountID,
+			&chunk.RemoteID, &chunk.RemotePath, &chunk.ChunkSize, &chunk.Checksum,
+			&chunk.Status, &chunk.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		chunks = append(chunks, chunk)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return chunks, nil
+}
+
+// DeleteChunks deletes all chunks for an object
+func (r *ObjectRepository) DeleteChunks(ctx context.Context, bucket, key string) error {
+	query := `DELETE FROM object_chunks WHERE bucket = $1 AND key = $2`
+	_, err := r.db.ExecContext(ctx, query, bucket, key)
+	return err
+}
+
+// ListAllObjects retrieves all objects with pagination
+func (r *ObjectRepository) ListAllObjects(ctx context.Context, limit, offset int) ([]*types.Object, error) {
+	query := `
+		SELECT bucket, key, account_id, remote_id, remote_path,
+		       size, etag, mime_type, is_chunked, chunk_count,
+		       metadata, created_at, updated_at
+		FROM objects
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var objects []*types.Object
+	for rows.Next() {
+		obj := &types.Object{}
+		var metadataJSON []byte
+
+		if err := rows.Scan(
+			&obj.Bucket, &obj.Key, &obj.AccountID, &obj.RemoteID, &obj.RemotePath,
+			&obj.Size, &obj.ETag, &obj.MimeType, &obj.IsChunked, &obj.ChunkCount,
+			&metadataJSON, &obj.CreatedAt, &obj.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		if len(metadataJSON) > 0 {
+			json.Unmarshal(metadataJSON, &obj.Metadata)
+		}
+
+		objects = append(objects, obj)
+	}
+
+	return objects, nil
+}
+
+// ListAllChunks retrieves all chunks with pagination
+func (r *ObjectRepository) ListAllChunks(ctx context.Context, limit, offset int) ([]*types.ObjectChunk, error) {
+	query := `
+		SELECT id, bucket, key, chunk_index, account_id, remote_id, remote_path,
+		       chunk_size, checksum, status, created_at
+		FROM object_chunks
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var chunks []*types.ObjectChunk
+	for rows.Next() {
+		chunk := &types.ObjectChunk{}
+		err := rows.Scan(
+			&chunk.ID, &chunk.Bucket, &chunk.Key, &chunk.ChunkIndex, &chunk.AccountID,
+			&chunk.RemoteID, &chunk.RemotePath, &chunk.ChunkSize, &chunk.Checksum,
+			&chunk.Status, &chunk.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		chunks = append(chunks, chunk)
+	}
+
+	return chunks, nil
 }

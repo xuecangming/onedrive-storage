@@ -39,7 +39,7 @@ type DriveItem struct {
 	Folder           *FolderMetadata        `json:"folder,omitempty"`
 	CTag             string                 `json:"cTag"`
 	ETag             string                 `json:"eTag"`
-	AdditionalData   map[string]interface{} `json:"@microsoft.graph.downloadUrl,omitempty"`
+	DownloadURL      string                 `json:"@microsoft.graph.downloadUrl,omitempty"`
 }
 
 // FileMetadata represents file-specific metadata
@@ -295,4 +295,79 @@ func (c *Client) UploadChunk(ctx context.Context, uploadURL string, chunk []byte
 	}
 
 	return nil
+}
+
+// GetItem retrieves item metadata
+func (c *Client) GetItem(ctx context.Context, itemID string) (*DriveItem, error) {
+	url := fmt.Sprintf("%s/me/drive/items/%s", c.baseURL, itemID)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.accessToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
+	}
+
+	var item DriveItem
+	if err := json.NewDecoder(resp.Body).Decode(&item); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &item, nil
+}
+
+// GetThumbnail retrieves a thumbnail for an item
+// size can be "small", "medium", "large"
+func (c *Client) GetThumbnail(ctx context.Context, itemID string, size string) ([]byte, string, error) {
+	// Map size to OneDrive size
+	// small: w=48, h=48
+	// medium: w=176, h=176
+	// large: w=1920, h=1920
+	// custom: c100x100_Crop
+	
+	// For simplicity, we use the standard sizes
+	// https://graph.microsoft.com/v1.0/me/drive/items/{item-id}/thumbnails/0/{size}/content
+	
+	url := fmt.Sprintf("%s/me/drive/items/%s/thumbnails/0/%s/content", c.baseURL, itemID, size)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.accessToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		// If 404, it might mean no thumbnail available
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, "", nil // No error, just no thumbnail
+		}
+		body, _ := io.ReadAll(resp.Body)
+		return nil, "", fmt.Errorf("API error: %s - %s", resp.Status, string(body))
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return data, contentType, nil
 }

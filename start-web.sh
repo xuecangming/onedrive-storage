@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Web Application Standalone Server
-# This script serves the web application on a separate port from the middleware
+# This script serves the React web application using Vite dev server
 
-PORT=${WEB_PORT:-3000}
-API_URL=${API_URL:-http://localhost:8080/api/v1}
+PORT=${WEB_PORT:-5173}
+API_URL=${API_URL:-http://localhost:8080}
 
 echo "=========================================="
 echo "   OneDrive Cloud Storage - Web Application"
@@ -15,19 +15,16 @@ echo "API URL:    ${API_URL}"
 echo ""
 echo "Note: Make sure the middleware is running at ${API_URL}"
 echo ""
-echo "To configure API URL, edit web-app/index.html or set API_URL environment variable"
 echo "Press Ctrl+C to stop"
 echo ""
 
-cd web-app
+cd cloud-drive
 
-# Use Python's built-in HTTP server
-if command -v python3 &> /dev/null; then
-    python3 -m http.server ${PORT}
-elif command -v python &> /dev/null; then
-    python -m SimpleHTTPServer ${PORT}
-else
-    echo "Error: Python is required to run the web server"
-    echo "Please install Python or use another HTTP server"
-    exit 1
+# Check if node_modules exists
+if [ ! -d "node_modules" ]; then
+    echo "Installing dependencies..."
+    npm install
 fi
+
+# Start development server
+npm run dev -- --port ${PORT}

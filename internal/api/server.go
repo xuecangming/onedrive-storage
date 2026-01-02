@@ -10,8 +10,10 @@ import (
 	"github.com/xuecangming/onedrive-storage/internal/common/types"
 	"github.com/xuecangming/onedrive-storage/internal/repository"
 	"github.com/xuecangming/onedrive-storage/internal/service/account"
+	"github.com/xuecangming/onedrive-storage/internal/service/audit"
 	"github.com/xuecangming/onedrive-storage/internal/service/bucket"
 	"github.com/xuecangming/onedrive-storage/internal/service/object"
+	"github.com/xuecangming/onedrive-storage/internal/service/task"
 	"github.com/xuecangming/onedrive-storage/internal/service/vfs"
 )
 
@@ -28,6 +30,8 @@ type Server struct {
 	vfsHandler         *handlers.VFSHandler
 	oauthHandler       *handlers.OAuthHandler
 	enhancedVFSHandler *handlers.EnhancedVFSHandler
+	auditHandler       *handlers.AuditHandler
+	taskHandler        *handlers.TaskHandler
 }
 
 // NewServer creates a new HTTP server
@@ -38,14 +42,17 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	accountRepo := repository.NewAccountRepository(db)
 	vfsRepo := repository.NewVFSRepository(db)
 	enhancedVFSRepo := repository.NewEnhancedVFSRepository(db)
+	taskRepo := repository.NewTaskRepository()
 
 	// Create services
 	bucketService := bucket.NewService(bucketRepo)
 	accountService := account.NewService(accountRepo)
 	// Use OneDrive integration for real storage
 	objectService := object.NewServiceWithOneDrive(objectRepo, bucketRepo, accountService)
-	vfsService := vfs.NewService(vfsRepo, objectService, bucketRepo)
+	taskService := task.NewService(taskRepo)
+	vfsService := vfs.NewService(vfsRepo, objectService, bucketRepo, taskService)
 	enhancedVFSService := vfs.NewEnhancedService(enhancedVFSRepo, vfsRepo, bucketRepo)
+	auditService := audit.NewService(objectRepo, accountService)
 
 	// Create handlers
 	bucketHandler := handlers.NewBucketHandler(bucketService)
@@ -55,6 +62,8 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 	healthHandler := handlers.NewHealthHandler(db)
 	vfsHandler := handlers.NewVFSHandler(vfsService)
 	enhancedVFSHandler := handlers.NewEnhancedVFSHandler(enhancedVFSService)
+	auditHandler := handlers.NewAuditHandler(auditService)
+	taskHandler := handlers.NewTaskHandler(taskService)
 
 	// Create OAuth handler (redirect URI will be determined dynamically from request)
 	oauthHandler := handlers.NewOAuthHandler(accountService, config.Server.BaseURL)
@@ -71,6 +80,8 @@ func NewServer(config *types.Config, db *sql.DB) *Server {
 		vfsHandler:         vfsHandler,
 		oauthHandler:       oauthHandler,
 		enhancedVFSHandler: enhancedVFSHandler,
+		auditHandler:       auditHandler,
+		taskHandler:        taskHandler,
 	}
 
 	server.setupRoutes()
@@ -127,14 +138,21 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/space/accounts/{id}/sync", s.spaceHandler.SyncAccount).Methods("POST", "OPTIONS")
 
 	// OAuth routes for OneDrive authorization
-	api.HandleFunc("/oauth/setup", s.oauthHandler.SetupGuide).Methods("GET", "OPTIONS")
-	api.HandleFunc("/oauth/create", s.oauthHandler.CreateAccount).Methods("GET", "POST", "OPTIONS")
-	api.HandleFunc("/oauth/accounts", s.oauthHandler.AccountList).Methods("GET", "OPTIONS")
 	api.HandleFunc("/oauth/authorize/{id}", s.oauthHandler.Authorize).Methods("GET", "OPTIONS")
 	api.HandleFunc("/oauth/callback", s.oauthHandler.Callback).Methods("GET", "OPTIONS")
 	api.HandleFunc("/oauth/status/{id}", s.oauthHandler.TokenStatus).Methods("GET", "OPTIONS")
 
 	// Virtual File System routes
+	// Multipart upload routes (must be before generic path routes to avoid conflict)
+	api.HandleFunc("/vfs/{bucket}/_upload/init", s.vfsHandler.InitiateMultipartUpload).Methods("POST", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_upload/{uploadId}", s.vfsHandler.UploadPart).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_upload/{uploadId}", s.vfsHandler.ListParts).Methods("GET", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_upload/{uploadId}", s.vfsHandler.AbortMultipartUpload).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/vfs/{bucket}/_upload/{uploadId}/complete", s.vfsHandler.CompleteMultipartUpload).Methods("POST", "OPTIONS")
+	
+	// Thumbnail route
+	api.HandleFunc("/vfs/{bucket}/_thumbnail", s.vfsHandler.GetThumbnail).Methods("GET", "OPTIONS")
+
 	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.UploadFile).Methods("PUT", "OPTIONS")
 	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Get).Methods("GET", "OPTIONS")
 	api.HandleFunc("/vfs/{bucket}/{path:.*}", s.vfsHandler.Head).Methods("HEAD", "OPTIONS")
@@ -158,6 +176,14 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vfs/{bucket}/_trash", s.enhancedVFSHandler.EmptyTrash).Methods("DELETE", "OPTIONS")
 	api.HandleFunc("/vfs/{bucket}/_trash/{trash_id}/restore", s.enhancedVFSHandler.RestoreFromTrash).Methods("POST", "OPTIONS")
 	api.HandleFunc("/vfs/{bucket}/_trash/{trash_id}", s.enhancedVFSHandler.DeleteFromTrash).Methods("DELETE", "OPTIONS")
+
+	// Audit routes
+	api.HandleFunc("/audit/start", s.auditHandler.StartAudit).Methods("POST", "OPTIONS")
+	api.HandleFunc("/audit/status", s.auditHandler.GetStatus).Methods("GET", "OPTIONS")
+
+	// Task routes
+	api.HandleFunc("/tasks", s.taskHandler.List).Methods("GET", "OPTIONS")
+	api.HandleFunc("/tasks/{id}", s.taskHandler.GetStatus).Methods("GET", "OPTIONS")
 
 	// Root endpoint - API info
 	s.router.HandleFunc("/", s.healthHandler.Info).Methods("GET", "OPTIONS")
